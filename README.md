@@ -1,10 +1,14 @@
 # HeMiDock
 
+[![Latest release](https://img.shields.io/github/v/release/Hemal1k/HeMiDock?label=release)](https://github.com/Hemal1k/HeMiDock/releases/latest) [![Downloads](https://img.shields.io/github/downloads/Hemal1k/HeMiDock/total)](https://github.com/Hemal1k/HeMiDock/releases) [![License: MIT](https://img.shields.io/github/license/Hemal1k/HeMiDock)](LICENSE) ![Windows 10 / 11](https://img.shields.io/badge/Windows-10%20%2F%2011-0078D4)
+
 A replacement of the Windows taskbar for Windows 10 and 11: a dock with the apps, the notification area, status icons and the
 clock, an own Start menu, a control center, a calendar with the notifications and a window manager. English and Czech, light
 and dark.
 
 **[Download](https://github.com/Hemal1k/HeMiDock/releases/latest)** · [Project page](https://hemal1k.github.io/hemidock.html) · [Report a problem](https://github.com/Hemal1k/HeMiDock/issues)
+
+![HeMiDock](.github/screenshot.png)
 
 > HeMiDock is in beta and not signed yet, so Windows SmartScreen may warn the first time it is installed (More info → Run anyway).
 
