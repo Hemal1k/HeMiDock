@@ -42,18 +42,32 @@ static class Updater
         }
     }
 
-    /// <summary>Installed by its installer (in the programs of the user, with its uninstall entry): it can update itself.</summary>
-    public static bool Installed
+    /// <summary>Installed by its installer (with its uninstall entry): it can update itself.</summary>
+    public static bool Installed => InstalledFor != null;
+
+    /// <summary>
+    /// "/CURRENTUSER" when the installer put this dock into the programs of the user (HKCU uninstall entry), "/ALLUSERS" when
+    /// into Program Files for all users (HKLM – its update asks for administrator rights); null for the zip / portable one.
+    /// </summary>
+    static string InstalledFor
     {
         get
         {
-            try
+            const string key = @"Software\Microsoft\Windows\CurrentVersion\Uninstall\HeMiDock_is1";
+            string here = Path.GetDirectoryName(Environment.ProcessPath);
+            bool Same(Microsoft.Win32.RegistryKey root)
             {
-                using var k = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Uninstall\HeMiDock_is1");
-                return k?.GetValue("InstallLocation") is string place
-                    && Path.GetFullPath(place).TrimEnd('\\').Equals(Path.GetDirectoryName(Environment.ProcessPath), StringComparison.OrdinalIgnoreCase);
+                try
+                {
+                    using var k = root.OpenSubKey(key);
+                    return k?.GetValue("InstallLocation") is string place
+                        && Path.GetFullPath(place).TrimEnd('\\').Equals(here, StringComparison.OrdinalIgnoreCase);
+                }
+                catch { return false; }
             }
-            catch { return false; }
+            if (Same(Microsoft.Win32.Registry.CurrentUser)) return "/CURRENTUSER";
+            using var machine = Microsoft.Win32.RegistryKey.OpenBaseKey(Microsoft.Win32.RegistryHive.LocalMachine, Microsoft.Win32.RegistryView.Registry64);
+            return Same(machine) ? "/ALLUSERS" : null;
         }
     }
 
@@ -113,7 +127,8 @@ static class Updater
     /// </summary>
     public static async Task InstallAsync(Release release)
     {
-        if (!Installed || release.SetupUrl == null) { Fg.Open(release.Page); return; }
+        string mode = InstalledFor;
+        if (mode == null || release.SetupUrl == null) { Fg.Open(release.Page); return; }
         try
         {
             Host.ShowInfo?.Invoke(L.T("Downloading HeMiDock {0}…", release.Version.ToString(3)));
@@ -124,7 +139,8 @@ static class Updater
                 await using var to = File.Create(file);
                 await response.Content.CopyToAsync(to);
             }
-            Process.Start(new ProcessStartInfo(file, "/SILENT /SUPPRESSMSGBOXES /NORESTART /UPDATE") { UseShellExecute = true });
+            // for all users the installer asks for administrator rights itself (UAC); for the user it runs without them
+            Process.Start(new ProcessStartInfo(file, $"/SILENT /SUPPRESSMSGBOXES /NORESTART /UPDATE {mode}") { UseShellExecute = true });
             App.Quit();                                                  // the installer replaces the files and starts the dock again
         }
         catch (Exception ex)

@@ -1,5 +1,5 @@
-; HeMiDock installer (Inno Setup 6). Built by release.ps1:  ISCC /DAppVersion=1.5.0 /DSourceDir=<published app> /DOutputDir=<folder>
-; Installs for the current user (no administrator), checks the .NET 10 Runtime and the Windows App Runtime 2.6 and installs
+﻿; HeMiDock installer (Inno Setup 6). Built by release.ps1:  ISCC /DAppVersion=1.5.0 /DSourceDir=<published app> /DOutputDir=<folder>
+; Installs for the current user (no administrator) or for all users (asked), checks the .NET 10 Runtime and the Windows App Runtime 2.6 and installs
 ; what is missing from Microsoft (only that asks for administrator rights). /UPDATE (the update of the app): quiet, starts the
 ; dock again afterwards.
 
@@ -22,11 +22,13 @@ AppPublisher=Richard Hemala
 AppPublisherURL=https://github.com/Hemal1k/HeMiDock
 AppSupportURL=https://github.com/Hemal1k/HeMiDock/issues
 AppUpdatesURL=https://github.com/Hemal1k/HeMiDock/releases
-DefaultDirName={localappdata}\Programs\HeMiDock
+DefaultDirName={autopf}\HeMiDock
 DisableDirPage=yes
 DisableProgramGroupPage=yes
 DefaultGroupName=HeMiDock
 PrivilegesRequired=lowest
+; the first page asks: for me only (default, no administrator) or for all users (Program Files, asks for administrator)
+PrivilegesRequiredOverridesAllowed=dialog commandline
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 MinVersion=10.0.19041
@@ -58,12 +60,13 @@ en.LaunchAfter=Start HeMiDock
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{userprograms}\HeMiDock"; Filename: "{app}\HeMiDock.exe"
+Name: "{autoprograms}\HeMiDock"; Filename: "{app}\HeMiDock.exe"
 
 [Run]
 ; after an interactive installation: offered; after an update (quiet): the dock starts again by itself
-Filename: "{app}\HeMiDock.exe"; Description: "{cm:LaunchAfter}"; Flags: nowait postinstall skipifsilent
-Filename: "{app}\HeMiDock.exe"; Parameters: "--after-update"; Flags: nowait; Check: WizardSilent
+; (as the user who started the installer – never as administrator after an installation for all users)
+Filename: "{app}\HeMiDock.exe"; Description: "{cm:LaunchAfter}"; Flags: nowait postinstall skipifsilent runasoriginaluser
+Filename: "{app}\HeMiDock.exe"; Parameters: "--after-update"; Flags: nowait runasoriginaluser; Check: WizardSilent
 
 [UninstallRun]
 Filename: "{app}\HeMiDock.exe"; Parameters: "--uninstall"; Flags: waituntilterminated; RunOnceId: "HeMiDockUninstall"

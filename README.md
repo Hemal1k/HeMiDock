@@ -16,7 +16,7 @@ and dark.
 
 | File | For |
 |---|---|
-| `HeMiDock-Setup.exe` | The installer – installs for the current user (no administrator), downloads the .NET 10 Runtime and the Windows App Runtime 2.6 when they are missing. New versions are offered by the app itself. |
+| `HeMiDock-Setup.exe` | The installer – just for you (no administrator) or for all users (Program Files); downloads the .NET 10 Runtime and the Windows App Runtime 2.6 when they are missing. New versions are offered by the app itself. |
 | `HeMiDock-Portable.zip` | Runs from any folder, nothing to install (everything inside, bigger). Updates by hand. |
 
 Requirements: Windows 10 2004 or newer / Windows 11, x64.
