@@ -1,4 +1,4 @@
-# Builds the downloads of a HeMiDock release – the same on a PC and in the GitHub workflow (.github/workflows/release.yml):
+# Builds the downloads of a HeMiDock release - the same on a PC and in the GitHub workflow (.github/workflows/release.yml):
 #   build\dist\HeMiDock-Setup.exe      the installer (Inno Setup 6), for the app that needs the .NET and Windows App runtimes
 #   build\dist\HeMiDock-Portable.zip   everything inside, runs from any folder
 # Needs: the .NET 10 SDK and Inno Setup 6. The version comes from <Version> in src\HeMiDock.csproj.
@@ -19,7 +19,7 @@ Remove-Item $dist, $work -Recurse -Force -ErrorAction SilentlyContinue
 New-Item -ItemType Directory $dist, $work | Out-Null
 Write-Host "HeMiDock $version" -ForegroundColor Cyan
 
-# the app for the installer (it needs the .NET 10 Runtime and the Windows App Runtime 2.6 – the installer gets them)
+# the app for the installer (it needs the .NET 10 Runtime and the Windows App Runtime 2.6 - the installer gets them)
 dotnet publish src\HeMiDock.csproj -c Release -r win-x64 -o "$work\app" -v q -nologo
 if ($LASTEXITCODE) { throw 'The build of the app failed.' }
 & $iscc /Q "/DAppVersion=$version" "/DSourceDir=$work\app" "/DOutputDir=$dist" (Join-Path $root 'installer\HeMiDock.iss')
