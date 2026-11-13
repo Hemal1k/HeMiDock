@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 
 namespace HeMiDock;
 
@@ -390,7 +390,6 @@ static class L
         ["Classic"] = "Klasický",
         ["Floating"] = "Plovoucí",
         ["Licenses"] = "Licence",
-        ["Licenses of the components used"] = "Licence použitých součástí",
         ["Default"] = "Výchozí",
         ["Default, monochrome"] = "Výchozí, jednobarevné",
         ["Dock width"] = "Šířka hlavního panelu",
@@ -631,12 +630,9 @@ static class L
         ["Version"] = "Verze",
         ["Build date"] = "Datum sestavení",
         ["Project on GitHub"] = "Projekt na GitHubu",
-        ["Source code, releases and the changelog"] = "Zdrojový kód, vydání a seznam změn",
         ["Report a problem"] = "Nahlásit problém",
-        ["Problems and ideas on GitHub (Issues)"] = "Problémy a nápady na GitHubu (Issues)",
         ["Updates"] = "Aktualizace",
         ["Check for updates automatically"] = "Automaticky hledat aktualizace",
-        ["After the start and once a day, on GitHub"] = "Po spuštění a jednou denně, na GitHubu",
         ["Check for updates"] = "Hledat aktualizace",
         ["Check now"] = "Zkontrolovat",
         ["Checking…"] = "Hledám…",

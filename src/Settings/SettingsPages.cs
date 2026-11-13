@@ -385,13 +385,13 @@ sealed partial class SettingsWindow
         InfoRow(about, "Build date", new TextBlock { Text = AppInfo.BuildDate?.ToString("d", System.Globalization.CultureInfo.CurrentCulture) ?? "–" });
         var project = new Button { Content = L.T("Open") };
         project.Click += (_, _) => Fg.Open(Updater.RepoUrl);
-        Card(about, "Project on GitHub", "Source code, releases and the changelog", project);
+        Card(about, "Project on GitHub", null, project);
         var report = new Button { Content = L.T("Open") };
         report.Click += (_, _) => Fg.Open(Updater.IssuesUrl);
-        Card(about, "Report a problem", "Problems and ideas on GitHub (Issues)", report);
+        Card(about, "Report a problem", null, report);
 
         Header(about, "Updates");
-        ToggleRow(about, "Check for updates automatically", "After the start and once a day, on GitHub", nameof(DockSettings.CheckUpdates));
+        ToggleRow(about, "Check for updates automatically", null, nameof(DockSettings.CheckUpdates));
         var check = new Button { Content = L.T("Check now") };
         var checkText = new TextBlock { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 12, 0), Foreground = ThemeBrush.Get("TextFillColorSecondaryBrush") };
         check.Click += async (_, _) =>
@@ -414,7 +414,7 @@ sealed partial class SettingsWindow
         var licenses = new Button { Content = L.T("Open") };
         // the file was never part of the build: the button opened nothing
         licenses.Click += (_, _) => Fg.Open(System.IO.Path.Combine(AppContext.BaseDirectory, "Assets", "ThirdPartyNotices.txt"));
-        Card(about, "Licenses", "Licenses of the components used", licenses);
+        Card(about, "Licenses", null, licenses);
         Header(about, "Diagnostics");
         ToggleRow(about, "Debug mode", null, nameof(DockSettings.DebugMode));
         var export = new Button { Content = L.T("Save to desktop") };
