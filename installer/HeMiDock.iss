@@ -45,22 +45,29 @@ RestartApplications=no
 LicenseFile=..\LICENSE
 
 [Languages]
-Name: "cs"; MessagesFile: "compiler:Languages\Czech.isl"
+; English only
 Name: "en"; MessagesFile: "compiler:Default.isl"
 
 [CustomMessages]
-cs.Prereq=Instaluji knihovny, které HeMiDock potřebuje: %1
 en.Prereq=Installing what HeMiDock needs: %1
-cs.PrereqFailed=Knihovnu %1 se nepodařilo nainstalovat. Nainstalujte ji prosím ručně a spusťte instalaci znovu:%n%2
 en.PrereqFailed=%1 could not be installed. Please install it by hand and run the installer again:%n%2
-cs.LaunchAfter=Spustit HeMiDock
 en.LaunchAfter=Start HeMiDock
+en.NeedTitle=Components from Microsoft
+en.NeedDesc=HeMiDock needs components that are missing on this PC.
+en.NeedText=The installer downloads them directly from Microsoft and installs them (Windows asks for administrator rights). They come with Microsoft's license terms – please read them before you continue:
+en.NeedLicense=license terms
+en.NeedAccept=I accept the license terms of these components and agree to download and install them
 
 [Files]
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
+[Tasks]
+; offered on its own page, off by default
+Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
+
 [Icons]
 Name: "{autoprograms}\HeMiDock"; Filename: "{app}\HeMiDock.exe"
+Name: "{autodesktop}\HeMiDock"; Filename: "{app}\HeMiDock.exe"; Tasks: desktopicon
 
 [Run]
 ; after an interactive installation: offered; after an update (quiet): the dock starts again by itself
@@ -75,9 +82,14 @@ Filename: "{app}\HeMiDock.exe"; Parameters: "--uninstall"; Flags: waituntiltermi
 const
   DotNetUrl = 'https://aka.ms/dotnet/10.0/dotnet-runtime-win-x64.exe';
   AppRuntimeUrl = 'https://aka.ms/windowsappsdk/2.6/latest/windowsappruntimeinstall-x64.exe';
+  DotNetLicense = 'https://aka.ms/dotnet-license';
+  AppRuntimeLicense = 'https://www.nuget.org/packages/Microsoft.WindowsAppSDK.Runtime/2.6.5/License';
 
 var
   DownloadPage: TDownloadWizardPage;
+  NeedPage: TWizardPage;
+  AcceptBox: TNewCheckBox;
+  NeedDotNet, NeedRuntime: Boolean;
 
 { the .NET 10 Runtime (x64): a folder 10.x of Microsoft.NETCore.App }
 function HasDotNet: Boolean;
@@ -118,20 +130,89 @@ begin
   Result := ShellExec('runas', FileName, Params, '', SW_SHOW, ewWaitUntilTerminated, Code) and ((Code = 0) or (Code = 3010));
 end;
 
-procedure InitializeWizard;
+procedure OpenLink(Sender: TObject);
+var
+  Code: Integer;
 begin
-  DownloadPage := CreateDownloadPage(SetupMessage(msgWizardPreparing), SetupMessage(msgPreparingDesc), nil);
+  ShellExec('open', TNewStaticText(Sender).Hint, '', '', SW_SHOWNORMAL, ewNoWait, Code);
 end;
 
-{ before the installation: what is missing is downloaded from Microsoft and installed }
-function NextButtonClick(CurPageID: Integer): Boolean;
+procedure AcceptClick(Sender: TObject);
+begin
+  WizardForm.NextButton.Enabled := AcceptBox.Checked;
+end;
+
+{ one missing component: its name and a link to its license terms }
+function AddComponent(const Name, License: String; Top: Integer): Integer;
 var
-  NeedDotNet, NeedRuntime: Boolean;
+  N, L: TNewStaticText;
+begin
+  N := TNewStaticText.Create(NeedPage);
+  N.Parent := NeedPage.Surface;
+  N.Top := Top;
+  N.Left := ScaleX(8);
+  N.Caption := '•  ' + Name + '  –  ';
+  N.Font.Style := [fsBold];
+  L := TNewStaticText.Create(NeedPage);
+  L.Parent := NeedPage.Surface;
+  L.Top := Top;
+  L.Left := N.Left + N.Width;
+  L.Caption := CustomMessage('NeedLicense');
+  L.Hint := License;
+  L.Cursor := crHand;
+  L.Font.Color := clHotLight;
+  L.Font.Style := [fsUnderline];
+  L.OnClick := @OpenLink;
+  Result := Top + L.Height + ScaleY(8);
+end;
+
+procedure InitializeWizard;
+var
+  T: TNewStaticText;
+  Y: Integer;
+begin
+  DownloadPage := CreateDownloadPage(SetupMessage(msgWizardPreparing), SetupMessage(msgPreparingDesc), nil);
+  NeedDotNet := not HasDotNet;
+  NeedRuntime := not HasAppRuntime;
+#ifdef TestNeedPage
+  NeedDotNet := True; NeedRuntime := True;   { ISCC /DTestNeedPage: shows the page on a PC that has everything }
+#endif
+
+  { what is missing is shown before anything is downloaded; Next only after the license terms are accepted }
+  NeedPage := CreateCustomPage(wpSelectTasks, CustomMessage('NeedTitle'), CustomMessage('NeedDesc'));
+  T := TNewStaticText.Create(NeedPage);
+  T.Parent := NeedPage.Surface;
+  T.Width := NeedPage.SurfaceWidth;
+  T.WordWrap := True;
+  T.AutoSize := True;
+  T.Caption := CustomMessage('NeedText');
+  Y := T.Top + T.Height + ScaleY(16);
+  if NeedDotNet then Y := AddComponent('.NET 10 Runtime (x64)', DotNetLicense, Y);
+  if NeedRuntime then Y := AddComponent('Windows App Runtime 2.6 (x64)', AppRuntimeLicense, Y);
+  AcceptBox := TNewCheckBox.Create(NeedPage);
+  AcceptBox.Parent := NeedPage.Surface;
+  AcceptBox.Top := Y + ScaleY(12);
+  AcceptBox.Width := NeedPage.SurfaceWidth;
+  AcceptBox.Height := ScaleY(34);
+  AcceptBox.Caption := CustomMessage('NeedAccept');
+  AcceptBox.OnClick := @AcceptClick;
+end;
+
+function ShouldSkipPage(PageID: Integer): Boolean;
+begin
+  Result := (PageID = NeedPage.ID) and not (NeedDotNet or NeedRuntime);
+end;
+
+procedure CurPageChanged(CurPageID: Integer);
+begin
+  if CurPageID = NeedPage.ID then WizardForm.NextButton.Enabled := AcceptBox.Checked;
+end;
+
+{ before the installation (after the consent above): what is missing is downloaded from Microsoft and installed }
+function NextButtonClick(CurPageID: Integer): Boolean;
 begin
   Result := True;
   if CurPageID <> wpReady then Exit;
-  NeedDotNet := not HasDotNet;
-  NeedRuntime := not HasAppRuntime;
   if not (NeedDotNet or NeedRuntime) then Exit;
   DownloadPage.Clear;
   if NeedDotNet then DownloadPage.Add(DotNetUrl, 'dotnet-runtime-win-x64.exe', '');
