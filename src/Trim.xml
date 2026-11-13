@@ -1,0 +1,8 @@
+<!-- The portable release (-p:Portable=true) trims .NET to what is used. What the trimming cannot see is kept here. -->
+<linker>
+  <!-- late-bound COM ("dynamic": the targets of shortcuts, Outlook) reads the type information of the objects through these
+       COM interfaces – trimmed, their methods were missing and the call went to a wrong place (the app ended at once) -->
+  <assembly fullname="System.Private.CoreLib">
+    <namespace fullname="System.Runtime.InteropServices.ComTypes" />
+  </assembly>
+</linker>

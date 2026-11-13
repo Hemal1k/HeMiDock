@@ -1,0 +1,22 @@
+<Application
+    x:Class="HeMiDock.App"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
+            </ResourceDictionary.MergedDictionaries>
+
+            <!-- an icon of the dock: no frame, a light background under the mouse -->
+            <Style x:Key="DockButton" TargetType="Button" BasedOn="{StaticResource DefaultButtonStyle}">
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="BorderThickness" Value="0" />
+                <Setter Property="Padding" Value="6" />
+                <Setter Property="CornerRadius" Value="6" />
+                <!-- no frame of the keyboard focus on the buttons of the dock and the bar (the window gets the focus when shown) -->
+                <Setter Property="UseSystemFocusVisuals" Value="False" />
+            </Style>
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

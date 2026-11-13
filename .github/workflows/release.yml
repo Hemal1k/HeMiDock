@@ -1,0 +1,45 @@
+# A release published on GitHub gets its downloads here: they are built from the source of its tag and attached to it.
+# Run by hand (Actions → Release → Run workflow) it only builds them, as an artifact to try out.
+name: Release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name || github.ref }}
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Inno Setup
+        run: choco install innosetup --no-progress -y
+
+      - name: Build the installer and the portable zip
+        shell: pwsh
+        run: ./release.ps1
+
+      # Code signing (SignPath Foundation) comes here once the project is accepted: the files of build/dist are sent to
+      # SignPath, signed and put back before they are attached.
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: HeMiDock
+          path: build/dist/*
+
+      - name: Attach to the release
+        if: github.event_name == 'release'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ github.event.release.tag_name }}" build/dist/HeMiDock-Setup.exe build/dist/HeMiDock-Portable.zip --clobber --repo "${{ github.repository }}"

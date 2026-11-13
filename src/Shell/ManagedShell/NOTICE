@@ -1,0 +1,16 @@
+HeMiDock includes parts of ManagedShell
+https://github.com/cairoshell/ManagedShell
+Copyright (c) the ManagedShell contributors
+Licensed under the Apache License, Version 2.0 (see LICENSE in this folder).
+
+Taken: ManagedShell.Interop, ManagedShell.Common (without search, startup and the shell window), ManagedShell.WindowsTray,
+ManagedShell.WindowsTasks, ManagedShell.UWPInterop and the ExplorerHelper and AppBarManager of ManagedShell.AppBar.
+
+Changed for HeMiDock (2026-11-04): no WPF and no Windows Forms – pictures of icons are pixels (ShellImage) read by calls
+of Windows, the WPF dispatcher and timer are replaced by ShellDispatcher and ShellTimer, the message window of Windows
+Forms by an own one (Compat.cs), collections are plain ObservableCollections instead of WPF views and dependency
+properties, the AppBarManager only answers the AppBar messages (no AppBar windows), the icons of Store apps come from
+the shell through HeMiDock, and ShellManager only starts what HeMiDock uses.
+
+Arranged for HeMiDock (2026-11-05): the files of each area are joined into one file (AppBar, Common, Helpers, Logging,
+Interop, Uwp, AppWindows, Tray); the name of every original file stays as a heading inside.

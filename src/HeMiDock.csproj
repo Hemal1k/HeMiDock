@@ -1,0 +1,152 @@
+<Project>
+
+  <!-- HeMiDock in WinUI 3, unpackaged, one project: the app here, its logic in Logic\, the taskbar part of the shell in
+       Shell\ (with the parts of ManagedShell, Apache License 2.0, see Shell\ManagedShell\LICENSE and NOTICE). Debug and
+       Release need the .NET 10 Runtime and the Windows App Runtime 2.6 (x64) installed on the PC; the portable release
+       (-p:Portable=true, below) carries both. -->
+
+  <!-- everything the build makes (bin, obj, publish) goes into build\ beside src\, nothing into the folder of the source;
+       set before the SDK is imported (it decides its folders there), so the SDK is imported by hand below -->
+  <PropertyGroup>
+    <UseArtifactsOutput>true</UseArtifactsOutput>
+    <ArtifactsPath>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\build'))</ArtifactsPath>
+  </PropertyGroup>
+  <Import Project="Sdk.props" Sdk="Microsoft.NET.Sdk" />
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <TargetPlatformMinVersion>10.0.19041.0</TargetPlatformMinVersion>
+    <SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>HeMiDock</RootNamespace>
+    <AssemblyName>HeMiDock</AssemblyName>
+    <Product>HeMiDock</Product>
+    <!-- big changes +1, smaller +0.1, really small +0.0.1 -->
+    <Version>1.6.0</Version>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <Platforms>x64</Platforms>
+    <UseWinUI>true</UseWinUI>
+    <WindowsPackageType>None</WindowsPackageType>
+    <!-- only the app: .NET and the Windows App Runtime are installed (a Debug build carrying both had some 600 files) -->
+    <WindowsAppSDKSelfContained>false</WindowsAppSDKSelfContained>
+    <SelfContained>false</SelfContained>
+    <!-- without it "dotnet publish" leaves out HeMiDock.pri and the compiled XAML (the windows would not load) -->
+    <EnableMsixTooling>true</EnableMsixTooling>
+    <!-- the release is compiled ahead (no JIT at the start): the first start was slow -->
+    <PublishReadyToRun Condition="'$(Configuration)' == 'Release'">true</PublishReadyToRun>
+    <!-- Program.cs starts the app: the watchdog runs without WinUI -->
+    <DefineConstants>$(DefineConstants);DISABLE_XAML_GENERATED_MAIN</DefineConstants>
+    <ApplicationIcon>Assets\HeMiDock.ico</ApplicationIcon>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <!-- the code of ManagedShell as it is: its own warnings are not ours -->
+    <NoWarn>$(NoWarn);CS0168;CS0169;CS0414;CS0649;CS0618;CS1998;CA1416;SYSLIB1054;CS8981</NoWarn>
+  </PropertyGroup>
+
+  <!-- -p:Portable=true: the release that runs without installing anything – .NET and the Windows App Runtime inside (both
+       may be given out with an app: .NET under the MIT license, the runtime of the Windows App SDK as its "distributable
+       code"; their licenses are in Assets\ThirdPartyNotices.txt). As small as it goes: .NET trimmed to what is used
+       (partial: only the parts of .NET marked as safe to trim; the app and its other libraries stay whole) -->
+  <PropertyGroup Condition="'$(Portable)' == 'true'">
+    <SelfContained>true</SelfContained>
+    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <PublishTrimmed Condition="'$(PortableTrim)' != 'false'">true</PublishTrimmed>
+    <TrimMode Condition="'$(TrimMode)' == ''">partial</TrimMode>
+    <!-- what trimming switches off by default and the app needs: COM (the shell, Outlook, Windows Search), JSON by
+         reflection (the settings) -->
+    <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
+    <JsonSerializerIsReflectionEnabledByDefault>true</JsonSerializerIsReflectionEnabledByDefault>
+    <SuppressTrimAnalysisWarnings>true</SuppressTrimAnalysisWarnings>
+    <!-- the WinRT glue of the own classes made at build time (they have to be partial – CsWinRT1028 – or a window refused
+         the own acrylic: "Specified cast is not valid") -->
+    <CsWinRTAotOptimizerEnabled>true</CsWinRTAotOptimizerEnabled>
+    <!-- only the languages of the app -->
+    <SatelliteResourceLanguages>en;cs</SatelliteResourceLanguages>
+    <!-- no debug files in the zip -->
+    <DebugType>none</DebugType>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <UseSystemResourceKeys>false</UseSystemResourceKeys>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(Portable)' == 'true'">
+    <!-- late-bound COM (Outlook through "dynamic") -->
+    <TrimmerRootAssembly Include="Microsoft.CSharp" />
+    <!-- kept whole: the app (settings by reflection, the code of ManagedShell) and the libraries that use reflection or COM -->
+    <TrimmerRootAssembly Include="HeMiDock;NAudio.Core;NAudio.Wasapi;System.Management;System.Data.OleDb" />
+    <!-- what the trimming cannot see (see Trim.xml) -->
+    <TrimmerRootDescriptor Include="Trim.xml" />
+  </ItemGroup>
+
+  <!-- the portable release without what it never loads: the debugging parts of .NET (debugger, dumps, other garbage
+       collectors, HTTP/3), the native parts of the Windows App SDK for search, widgets, AI and notifications, and the texts
+       of WinUI in languages other than Czech and English -->
+  <Target Name="PortableLeaveOut" AfterTargets="ComputeResolvedFilesToPublishList" Condition="'$(Portable)' == 'true'">
+    <ItemGroup>
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(Filename)%(Extension)' == 'Microsoft.DiaSymReader.Native.amd64.dll'
+        Or $([System.String]::Copy('%(Filename)').StartsWith('mscordaccore')) Or '%(Filename)' == 'mscordbi' Or '%(Filename)' == 'createdump'
+        Or '%(Filename)' == 'clrgc' Or '%(Filename)' == 'clrgcexp' Or '%(Filename)' == 'msquic'
+        Or '%(Filename)%(Extension)' == 'Microsoft.Windows.Search.dll' Or $([System.String]::Copy('%(Filename)').StartsWith('Microsoft.Asg.'))
+        Or '%(Filename)%(Extension)' == 'Microsoft.Windows.Widgets.dll' Or '%(Filename)' == 'PerceptiveStreaming' Or '%(Filename)' == 'NPUDetect'
+        Or $([System.String]::Copy('%(Filename)').StartsWith('Microsoft.Windows.Workloads')) Or '%(Filename)%(Extension)' == 'Microsoft.Graphics.Imaging.dll'
+        Or '%(Filename)' == 'RestartAgent' Or '%(Filename)' == 'PushNotificationsLongRunningTask.ProxyStub'" />
+      <!-- the full licenses of what the portable release carries (Settings → About → Licenses names them) -->
+      <ResolvedFileToPublish Include="$(NuGetPackageRoot)microsoft.netcore.app.runtime.win-x64\$(BundledNETCoreAppPackageVersion)\LICENSE.TXT" RelativePath="Licenses\.NET - LICENSE.txt" CopyToPublishDirectory="PreserveNewest" />
+      <ResolvedFileToPublish Include="$(NuGetPackageRoot)microsoft.netcore.app.runtime.win-x64\$(BundledNETCoreAppPackageVersion)\THIRD-PARTY-NOTICES.TXT" RelativePath="Licenses\.NET - THIRD-PARTY-NOTICES.txt" CopyToPublishDirectory="PreserveNewest" />
+      <ResolvedFileToPublish Include="$(NuGetPackageRoot)microsoft.windowsappsdk\2.6.4\license.txt" RelativePath="Licenses\Windows App SDK - license.txt" CopyToPublishDirectory="PreserveNewest" />
+      <ResolvedFileToPublish Include="$(NuGetPackageRoot)microsoft.windowsappsdk\2.6.4\NOTICE.txt" RelativePath="Licenses\Windows App SDK - NOTICE.txt" CopyToPublishDirectory="PreserveNewest" />
+      <ResolvedFileToPublish Include="$(NuGetPackageRoot)microsoft.windowsappsdk.winui\2.6.4\NOTICE.txt" RelativePath="Licenses\WinUI - NOTICE.txt" CopyToPublishDirectory="PreserveNewest" />
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(Extension)' == '.mui'
+        And !$([System.String]::Copy('%(RelativePath)').StartsWith('cs-CZ', StringComparison.OrdinalIgnoreCase))
+        And !$([System.String]::Copy('%(RelativePath)').StartsWith('en-us', StringComparison.OrdinalIgnoreCase))" />
+    </ItemGroup>
+  </Target>
+
+  <!-- parts of the Windows App SDK the app does not use (machine learning and AI, WebView2, app and push notifications,
+       widgets, OAuth, pickers and storage, camera, search, deployment, access control, power, background tasks): not in
+       the release; the core of WinUI, windowing, resources and the bootstrapper stay -->
+  <Target Name="LeaveOutUnused" AfterTargets="ComputeResolvedFilesToPublishList">
+    <ItemGroup>
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(Filename)' == 'onnxruntime' Or '%(Filename)' == 'DirectML'
+        Or '%(Filename)' == 'Microsoft.ML.OnnxRuntime' Or '%(Filename)' == 'System.Numerics.Tensors'
+        Or $([System.String]::Copy('%(Filename)').StartsWith('Microsoft.Windows.AI'))
+        Or $([System.String]::Copy('%(Filename)').StartsWith('Microsoft.Web.WebView2')) Or '%(Filename)' == 'WebView2Loader'
+        Or $([System.String]::Copy('%(Filename)').StartsWith('Microsoft.Windows.AppNotifications'))
+        Or '%(Filename)' == 'Microsoft.Windows.PushNotifications.Projection' Or '%(Filename)' == 'Microsoft.Windows.BadgeNotifications.Projection'
+        Or '%(Filename)' == 'Microsoft.Windows.Widgets.Projection' Or '%(Filename)' == 'Microsoft.Security.Authentication.OAuth.Projection'
+        Or '%(Filename)' == 'Microsoft.Graphics.Imaging.Projection' Or $([System.String]::Copy('%(Filename)').StartsWith('Microsoft.Windows.Storage'))
+        Or '%(Filename)' == 'Microsoft.Windows.Media.Capture.Projection' Or '%(Filename)' == 'Microsoft.Windows.Search.Projection'
+        Or '%(Filename)' == 'Microsoft.Windows.Management.Deployment.Projection' Or '%(Filename)' == 'Microsoft.Windows.Security.AccessControl.Projection'
+        Or '%(Filename)' == 'Microsoft.Windows.System.Power.Projection' Or $([System.String]::Copy('%(Filename)').StartsWith('Microsoft.Windows.ApplicationModel.Background'))" />
+    </ItemGroup>
+  </Target>
+
+  <ItemGroup>
+    <!-- when this build was made (Settings → About) -->
+    <AssemblyMetadata Include="BuildDate" Value="$([System.DateTime]::UtcNow.ToString(&quot;o&quot;))" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- the logo of the guide and the icon of the windows -->
+    <Content Include="Assets\HeMiDock.png" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\HeMiDock.ico" CopyToOutputDirectory="PreserveNewest" />
+    <!-- Settings → About → Licenses (with the full license of ManagedShell, which its license asks for) -->
+    <Content Include="Assets\ThirdPartyNotices.txt" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.6.4" />
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.28000.2705" />
+    <!-- sign-out and display changes (it came with WPF before; on its own it needs nothing of it) -->
+    <PackageReference Include="Microsoft.Win32.SystemEvents" Version="9.0.10" />
+    <!-- volume control (Core Audio) -->
+    <PackageReference Include="NAudio.Wasapi" Version="2.2.1" />
+    <!-- display brightness (WMI) -->
+    <PackageReference Include="System.Management" Version="9.0.10" />
+    <!-- file search in the Windows Search index -->
+    <PackageReference Include="System.Data.OleDb" Version="9.0.10" />
+  </ItemGroup>
+
+  <Import Project="Sdk.targets" Sdk="Microsoft.NET.Sdk" />
+
+</Project>

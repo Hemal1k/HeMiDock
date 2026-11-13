@@ -1,0 +1,9 @@
+# everything the build makes goes to build\ (see src\HeMiDock.csproj)
+build/
+# own notes and the private publishing script (not part of the project)
+docs/
+bin/
+obj/
+.vs/
+*.user
+*.suo
