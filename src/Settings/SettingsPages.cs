@@ -418,17 +418,27 @@ sealed partial class SettingsWindow
         InfoRow(about, "Author", new TextBlock { Text = "Richard Hemala" });
         InfoRow(about, "Version", new TextBlock { Text = AppInfo.Version });
         InfoRow(about, "Build date", new TextBlock { Text = AppInfo.BuildDate?.ToString("d", System.Globalization.CultureInfo.CurrentCulture) ?? "–" });
-        var project = new Button { Content = L.T("Open") };
-        project.Click += (_, _) => Fg.Open(Updater.RepoUrl);
-        Card(about, "Project on GitHub", null, project);
-        var report = new Button { Content = L.T("Open") };
-        report.Click += (_, _) => Fg.Open(Updater.IssuesUrl);
-        Card(about, "Report a problem", null, report);
-
-        var licenses = new Button { Content = L.T("Open") };
-        // the file was never part of the build: the button opened nothing
-        licenses.Click += (_, _) => Fg.Open(System.IO.Path.Combine(AppContext.BaseDirectory, "Assets", "ThirdPartyNotices.txt"));
-        Card(about, "Licenses", null, licenses);
+        // the links side by side in one card (as in the other HeMi apps), not a row with "Open" for each
+        Header(about, "Links");
+        // four equal buttons that always fit (HeMi Launcher has its place in General → Updates)
+        var links = new Grid { ColumnSpacing = 8 };
+        void Link(string text, Action click)
+        {
+            var b = new Button { Content = L.T(text), HorizontalAlignment = HorizontalAlignment.Stretch };
+            b.Click += (_, _) => click();
+            links.ColumnDefinitions.Add(new ColumnDefinition());
+            Grid.SetColumn(b, links.Children.Count);
+            links.Children.Add(b);
+        }
+        Link("Project on GitHub", () => Fg.Open(Updater.RepoUrl));
+        Link("What's new", () => Fg.Open(Updater.RepoUrl + "/releases"));
+        Link("Report a problem", () => Fg.Open(Updater.IssuesUrl));
+        Link("Licenses", () => Fg.Open(System.IO.Path.Combine(AppContext.BaseDirectory, "Assets", "ThirdPartyNotices.txt")));
+        about.Children.Add(new Border
+        {
+            CornerRadius = new CornerRadius(10), BorderThickness = new Thickness(1), Padding = new Thickness(18, 14, 18, 14), Child = links,
+            Background = ThemeBrush.Get("CardBackgroundFillColorDefaultBrush"), BorderBrush = ThemeBrush.Get("CardStrokeColorDefaultBrush")
+        });
         Header(about, "Diagnostics");
         ToggleRow(about, "Debug mode", null, nameof(DockSettings.DebugMode));
         var export = new Button { Content = L.T("Save to desktop") };

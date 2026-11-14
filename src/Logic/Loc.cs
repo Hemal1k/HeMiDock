@@ -631,6 +631,7 @@ static class L
         ["Build date"] = "Datum sestavení",
         ["Project on GitHub"] = "Projekt na GitHubu",
         ["Report a problem"] = "Nahlásit problém",
+        ["Links"] = "Odkazy",
         ["Updates"] = "Aktualizace",
         ["Check for updates automatically"] = "Automaticky hledat aktualizace",
         ["Check for updates"] = "Hledat aktualizace",

@@ -1,4 +1,4 @@
-﻿<Project>
+<Project>
 
   <!-- HeMiDock in WinUI 3, unpackaged, one project: the app here, its logic in Logic\, the taskbar part of the shell in
        Shell\ (with the parts of ManagedShell, Apache License 2.0, see Shell\ManagedShell\LICENSE and NOTICE). Debug and
@@ -24,7 +24,7 @@
     <AssemblyName>HeMiDock</AssemblyName>
     <Product>HeMiDock</Product>
     <!-- big changes +1, smaller +0.1, really small +0.0.1 -->
-    <Version>1.7.0</Version>
+    <Version>1.7.1</Version>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == ''">win-x64</RuntimeIdentifier>
     <Platforms>x64;ARM64</Platforms>
