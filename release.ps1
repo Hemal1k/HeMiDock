@@ -1,6 +1,8 @@
 # Builds the downloads of a HeMiDock release - the same on a PC and in the GitHub workflow (.github/workflows/release.yml):
-#   build\dist\HeMiDock-Setup.exe      the installer (Inno Setup 6), for the app that needs the .NET and Windows App runtimes
-#   build\dist\HeMiDock-Portable.zip   everything inside, runs from any folder
+#   build\dist\HeMiDock-Setup.exe              the installer (Inno Setup 6): x64, and ARM64 on Windows on ARM; it gets
+#                                              the .NET and Windows App runtimes the app needs
+#   build\dist\HeMiDock-Portable.zip           everything inside, runs from any folder (x64)
+#   build\dist\HeMiDock-Portable-arm64.zip     the same for Windows on ARM
 # Needs: the .NET 10 SDK and Inno Setup 6. The version comes from <Version> in src\HeMiDock.csproj.
 $ErrorActionPreference = 'Stop'
 $root = $PSScriptRoot
@@ -19,16 +21,21 @@ Remove-Item $dist, $work -Recurse -Force -ErrorAction SilentlyContinue
 New-Item -ItemType Directory $dist, $work | Out-Null
 Write-Host "HeMiDock $version" -ForegroundColor Cyan
 
-# the app for the installer (it needs the .NET 10 Runtime and the Windows App Runtime 2.6 - the installer gets them)
-dotnet publish src\HeMiDock.csproj -c Release -r win-x64 -o "$work\app" -v q -nologo
-if ($LASTEXITCODE) { throw 'The build of the app failed.' }
-& $iscc /Q "/DAppVersion=$version" "/DSourceDir=$work\app" "/DOutputDir=$dist" (Join-Path $root 'installer\HeMiDock.iss')
+# the apps for the installer, x64 and ARM64 (they need the .NET 10 Runtime and the Windows App Runtime 2.6 of their
+# processor - the installer gets them); one installer puts the right one on the PC
+foreach ($rid in 'win-x64', 'win-arm64') {
+    dotnet publish src\HeMiDock.csproj -c Release -r $rid -o "$work\app-$rid" -v q -nologo
+    if ($LASTEXITCODE) { throw "The build of the app failed ($rid)." }
+}
+& $iscc /Q "/DAppVersion=$version" "/DSourceDir=$work\app-win-x64" "/DSourceDirArm=$work\app-win-arm64" "/DOutputDir=$dist" (Join-Path $root 'installer\HeMiDock.iss')
 if ($LASTEXITCODE) { throw 'The installer could not be made.' }
 
-# the portable app: .NET and the Windows App Runtime inside, one folder "HeMiDock Portable" in the zip
-dotnet publish src\HeMiDock.csproj -c Release -r win-x64 -p:Portable=true -o "$work\HeMiDock Portable" -v q -nologo
-if ($LASTEXITCODE) { throw 'The portable build failed.' }
-Compress-Archive "$work\HeMiDock Portable" -DestinationPath "$dist\HeMiDock-Portable.zip"
-
+# the portable apps: .NET and the Windows App Runtime inside; the files right in the zip, no folder around them
+foreach ($rid in 'win-x64', 'win-arm64') {
+    dotnet publish src\HeMiDock.csproj -c Release -r $rid -p:Portable=true -o "$work\portable-$rid" -v q -nologo
+    if ($LASTEXITCODE) { throw "The portable build failed ($rid)." }
+    $zip = if ($rid -eq 'win-x64') { "$dist\HeMiDock-Portable.zip" } else { "$dist\HeMiDock-Portable-arm64.zip" }
+    Compress-Archive -Path "$work\portable-$rid\*" -DestinationPath $zip
+}
 Remove-Item $work -Recurse -Force
 Get-ChildItem $dist | ForEach-Object { Write-Host ("  {0}  {1:N1} MB" -f $_.Name, ($_.Length / 1MB)) }

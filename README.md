@@ -3,7 +3,7 @@
 [![Latest release](https://img.shields.io/github/v/release/Hemal1k/HeMiDock?label=release)](https://github.com/Hemal1k/HeMiDock/releases/latest) [![Downloads](https://img.shields.io/github/downloads/Hemal1k/HeMiDock/total)](https://github.com/Hemal1k/HeMiDock/releases) [![License: MIT](https://img.shields.io/github/license/Hemal1k/HeMiDock)](LICENSE) ![Windows 10 / 11](https://img.shields.io/badge/Windows-10%20%2F%2011-0078D4)
 
 A replacement of the Windows taskbar for Windows 10 and 11: a dock with the apps, the notification area, status icons and the
-clock, an own Start menu, a control center, a calendar with the notifications and a window manager. English and Czech, light
+clock, an own Start menu, a control center, a calendar with the notifications and a window manager. Light
 and dark.
 
 **[Download](https://github.com/Hemal1k/HeMiDock/releases/latest)** · [Project page](https://hemal1k.github.io/hemidock.html) · [Report a problem](https://github.com/Hemal1k/HeMiDock/issues)
@@ -16,10 +16,11 @@ and dark.
 
 | File | For |
 |---|---|
-| `HeMiDock-Setup.exe` | The installer – just for you (no administrator) or for all users (Program Files); downloads the .NET 10 Runtime and the Windows App Runtime 2.6 when they are missing. New versions are offered by the app itself. |
-| `HeMiDock-Portable.zip` | Runs from any folder, nothing to install (everything inside, bigger). Updates by hand. |
+| `HeMiDock-Setup.exe` | The installer – just for you (no administrator) or for all users (Program Files); downloads the .NET 10 Runtime and the Windows App Runtime 2.6 when they are missing. New versions are offered by the app itself (or by [HeMi Launcher](https://github.com/Hemal1k/HeMiLauncher) when it is installed). |
+| `HeMiDock-Portable.zip` | Runs from any folder, nothing to install (everything inside, bigger). Updates by hand – or by HeMi Launcher. |
+| `HeMiDock-Portable-arm64.zip` | The same for Windows on ARM. |
 
-Requirements: Windows 10 2004 or newer / Windows 11, x64.
+Requirements: Windows 10 2004 or newer / Windows 11, x64 or ARM64.
 
 ## Features
 
@@ -47,7 +48,7 @@ Everything the build makes goes to `build\`; the app runs from `build\bin\HeMiDo
 Stop a running dock first (`HeMiDock.exe --exit`) – it keeps its files open.
 
 Command line: `--open start|search|control|calendar|settings[:page]`, `--exit`, `--measure` (start times and load into
-`%AppData%\HeMiDock\Logs\log.txt`). Debug builds only: `--selftest`, `--cycle`, `--simulate battery=34,charging,wifi,bluetooth,cellular`.
+`%AppData%\HeMi\HeMiDock\Logs\log.txt`). Debug builds only: `--selftest`, `--cycle`, `--simulate battery=34,charging,wifi,bluetooth,cellular`.
 
 ## Releases
 
@@ -74,7 +75,7 @@ How the parts work together:
 
 - The logic asks the UI for things through `Host` (`src\Logic\Host.cs`) and hands work back to the UI thread with `Ui.Post`.
 - Pop-ups are `PopupWindow`s in a `PopupHost`; animations run on the compositor (`src\Ui\Motion.cs`).
-- Settings are the properties of `DockSettings` (`src\Logic\Settings.cs`), stored in `%AppData%\HeMiDock\settings.json`;
+- Settings are the properties of `DockSettings` (`src\Logic\Settings.cs`), stored in `%AppData%\HeMi\HeMiDock\settings.json`;
   texts are English in the code and translated in `src\Logic\Loc.cs`.
 
 Problems and ideas are welcome in [Issues](https://github.com/Hemal1k/HeMiDock/issues).

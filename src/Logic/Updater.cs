@@ -79,12 +79,28 @@ static class Updater
         var first = queue.CreateTimer();
         first.Interval = TimeSpan.FromSeconds(30);
         first.IsRepeating = false;
-        first.Tick += (_, _) => { if (DockSettings.Current.CheckUpdates) _ = CheckAsync(quiet: true); };
+        // with HeMi Launcher on this PC the updates are its job: the dock only shows what it found
+        first.Tick += (_, _) => { if (DockSettings.Current.CheckUpdates && !HeMiLauncher.Present) _ = CheckAsync(quiet: true); };
         first.Start();
         _daily = queue.CreateTimer();
         _daily.Interval = TimeSpan.FromHours(24);
-        _daily.Tick += (_, _) => { if (DockSettings.Current.CheckUpdates) _ = CheckAsync(quiet: true); };
+        _daily.Tick += (_, _) => { if (DockSettings.Current.CheckUpdates && !HeMiLauncher.Present) _ = CheckAsync(quiet: true); };
         _daily.Start();
+        _launcher = queue.CreateTimer();
+        _launcher.Interval = TimeSpan.FromSeconds(30);
+        _launcher.Tick += (_, _) => WatchLauncher();
+        _launcher.Start();
+        WatchLauncher();
+    }
+
+    static Microsoft.UI.Dispatching.DispatcherQueueTimer _launcher;
+
+    /// <summary>The updates HeMi Launcher found (read every 30 s); a version the dock found itself goes when the launcher came.</summary>
+    static void WatchLauncher()
+    {
+        bool changed = HeMiLauncher.Refresh();
+        if (HeMiLauncher.Present && Available != null) { Available = null; changed = true; }
+        if (changed) Changed?.Invoke();
     }
 
     /// <summary>
@@ -148,5 +164,59 @@ static class Updater
             Log.Write("Update install", ex);
             Fg.Open(release.Page);                                      // the download failed: the page instead
         }
+    }
+}
+
+/// <summary>
+/// HeMi Launcher (installs and updates the HeMi apps): when it is on this PC, HeMiDock leaves its updates to it – no own
+/// checks, the Updates of the settings open the launcher, and the status icon of new versions shows what the launcher found
+/// for all HeMi apps (%LocalAppData%\HeMiLauncher\updates.txt, one line "&lt;id&gt; &lt;version&gt;" each).
+/// </summary>
+static class HeMiLauncher
+{
+    static string UpdatesFile => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "HeMi", "HeMiLauncher", "updates.txt");
+
+    /// <summary>The exe of the launcher (it writes where it is at each start; null when it is not there any more).</summary>
+    public static string Exe
+    {
+        get
+        {
+            try
+            {
+                using var k = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\HeMi\HeMiLauncher");
+                return k?.GetValue("Path") is string p && File.Exists(p) ? p : null;
+            }
+            catch { return null; }
+        }
+    }
+
+    public static bool Present => Exe != null;
+
+    /// <summary>The apps with a new version, as the launcher found them ("HeMiPix 1.1.0").</summary>
+    public static IReadOnlyList<string> Updates { get; private set; } = [];
+
+    /// <summary>Reads the updates again; true when they changed.</summary>
+    public static bool Refresh()
+    {
+        List<string> now = [];
+        try
+        {
+            if (Present && File.Exists(UpdatesFile))
+                foreach (var line in File.ReadAllLines(UpdatesFile))
+                    if (line.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries) is [var id, var v])
+                        now.Add($"{(id == "HeMiDark" ? "HeMi Dark" : id == "HeMiLauncher" ? "HeMi Launcher" : id)} {v.Trim()}");
+        }
+        catch (Exception ex) { Log.Write("Launcher updates", ex); }
+        if (now.SequenceEqual(Updates)) return false;
+        Updates = now;
+        return true;
+    }
+
+    /// <summary>Opens the launcher (the running one comes to the front) and lets it look for updates.</summary>
+    public static void Open()
+    {
+        if (Exe is not string exe) return;
+        try { Process.Start(new ProcessStartInfo(exe, "--check") { UseShellExecute = false }); }
+        catch (Exception ex) { Log.Write("Open HeMi Launcher", ex); }
     }
 }

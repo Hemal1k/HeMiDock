@@ -17,6 +17,31 @@ sealed partial class SettingsWindow
         return picker;
     }
 
+    /// <summary>The own update checks of the dock (without HeMi Launcher on this PC).</summary>
+    void GeneralUpdates(StackPanel general)
+    {
+        ToggleRow(general, "Check for updates automatically", null, nameof(DockSettings.CheckUpdates));
+        var check = new Button { Content = L.T("Check now") };
+        var checkText = new TextBlock { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 12, 0), Foreground = ThemeBrush.Get("TextFillColorSecondaryBrush") };
+        check.Click += async (_, _) =>
+        {
+            check.IsEnabled = false;
+            checkText.Text = L.T("Checking…");
+            var release = await Updater.CheckAsync(quiet: false);
+            check.IsEnabled = true;
+            if (release == null) checkText.Text = L.T("GitHub could not be reached.");
+            else if (release.Version <= Updater.Current) checkText.Text = L.T("HeMiDock is up to date.");
+            else
+            {
+                checkText.Text = L.T("HeMiDock {0} is available.", release.Version.ToString(3));
+                var install = new Button { Content = L.T(Updater.Installed ? "Install" : "Download") };
+                install.Click += (_, _) => _ = Updater.InstallAsync(release);
+                if (check.Parent is StackPanel row && row.Children.Count == 2) row.Children.Add(install);
+            }
+        };
+        Card(general, "Check for updates", null, new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, Children = { checkText, check } });
+    }
+
     void BuildPages()
     {
         var c = DockSettings.Current;
@@ -39,26 +64,15 @@ sealed partial class SettingsWindow
         ChoiceRow(general, "Notification position", "At the clock, top right with the top bar", nameof(DockSettings.ToastPosition),
             "Automatic", "At the clock", "Top right", "Top left", "Bottom right", "Bottom left");
         Header(general, "Updates");
-        ToggleRow(general, "Check for updates automatically", null, nameof(DockSettings.CheckUpdates));
-        var check = new Button { Content = L.T("Check now") };
-        var checkText = new TextBlock { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 12, 0), Foreground = ThemeBrush.Get("TextFillColorSecondaryBrush") };
-        check.Click += async (_, _) =>
+        if (HeMiLauncher.Present)
         {
-            check.IsEnabled = false;
-            checkText.Text = L.T("Checking…");
-            var release = await Updater.CheckAsync(quiet: false);
-            check.IsEnabled = true;
-            if (release == null) checkText.Text = L.T("GitHub could not be reached.");
-            else if (release.Version <= Updater.Current) checkText.Text = L.T("HeMiDock is up to date.");
-            else
-            {
-                checkText.Text = L.T("HeMiDock {0} is available.", release.Version.ToString(3));
-                var install = new Button { Content = L.T(Updater.Installed ? "Install" : "Download") };
-                install.Click += (_, _) => _ = Updater.InstallAsync(release);
-                if (check.Parent is StackPanel row && row.Children.Count == 2) row.Children.Add(install);
-            }
-        };
-        Card(general, "Check for updates", null, new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, Children = { checkText, check } });
+            // HeMi Launcher keeps the HeMi apps up to date: no own checks here
+            var openLauncher = new Button { Content = L.T("Open") };
+            openLauncher.Click += (_, _) => HeMiLauncher.Open();
+            Card(general, "Updates by HeMi Launcher", null, openLauncher);
+        }
+        else
+            GeneralUpdates(general);
         Header(general, "Colors and effects");
         ChoiceRow(general, "App theme", null, nameof(DockSettings.ThemeMode), "Automatic", "Light", "Dark");
         // the mode of Windows itself: light or dark at once, or by the time of day

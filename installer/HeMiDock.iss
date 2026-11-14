@@ -9,6 +9,9 @@
 #ifndef SourceDir
   #define SourceDir "..\build\publish"
 #endif
+#ifndef SourceDirArm
+  #define SourceDirArm ""
+#endif
 #ifndef OutputDir
   #define OutputDir "..\build\installer"
 #endif
@@ -29,8 +32,8 @@ DefaultGroupName=HeMiDock
 PrivilegesRequired=lowest
 ; the first page asks: for me only (default, no administrator) or for all users (Program Files, asks for administrator)
 PrivilegesRequiredOverridesAllowed=dialog commandline
-ArchitecturesAllowed=x64compatible
-ArchitecturesInstallIn64BitMode=x64compatible
+ArchitecturesAllowed=x64compatible or arm64
+ArchitecturesInstallIn64BitMode=x64compatible or arm64
 MinVersion=10.0.19041
 OutputDir={#OutputDir}
 OutputBaseFilename=HeMiDock-Setup
@@ -59,7 +62,13 @@ en.NeedLicense=license terms
 en.NeedAccept=I accept the license terms of these components and agree to download and install them
 
 [Files]
+; x64, and the ARM64 build on Windows on ARM when the installer has it
+#if SourceDirArm != ""
+Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Check: not IsArm64
+Source: "{#SourceDirArm}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Check: IsArm64
+#else
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+#endif
 
 [Tasks]
 ; offered on its own page, off by default
@@ -80,8 +89,6 @@ Filename: "{app}\HeMiDock.exe"; Parameters: "--uninstall"; Flags: waituntiltermi
 
 [Code]
 const
-  DotNetUrl = 'https://aka.ms/dotnet/10.0/dotnet-runtime-win-x64.exe';
-  AppRuntimeUrl = 'https://aka.ms/windowsappsdk/2.6/latest/windowsappruntimeinstall-x64.exe';
   DotNetLicense = 'https://aka.ms/dotnet-license';
   AppRuntimeLicense = 'https://www.nuget.org/packages/Microsoft.WindowsAppSDK.Runtime/2.6.5/License';
 
@@ -91,7 +98,27 @@ var
   AcceptBox: TNewCheckBox;
   NeedDotNet, NeedRuntime: Boolean;
 
-{ the .NET 10 Runtime (x64): a folder 10.x of Microsoft.NETCore.App }
+{ the processor the app is installed for: arm64 on Windows on ARM when the installer has that build, else x64 }
+function Arch: String;
+begin
+#if SourceDirArm != ""
+  if IsArm64 then Result := 'arm64' else Result := 'x64';
+#else
+  Result := 'x64';
+#endif
+end;
+
+function DotNetUrl: String;
+begin
+  Result := 'https://aka.ms/dotnet/10.0/dotnet-runtime-win-' + Arch + '.exe';
+end;
+
+function AppRuntimeUrl: String;
+begin
+  Result := 'https://aka.ms/windowsappsdk/2.6/latest/windowsappruntimeinstall-' + Arch + '.exe';
+end;
+
+{ the .NET 10 Runtime of that processor: a folder 10.x of Microsoft.NETCore.App }
 function HasDotNet: Boolean;
 var
   Found: TFindRec;
@@ -101,12 +128,17 @@ begin
 end;
 
 { the Windows App Runtime 2.6 or newer (x64), asked by PowerShell }
+function AppxArch: String;
+begin
+  if Arch = 'arm64' then Result := 'Arm64' else Result := 'X64';
+end;
+
 function HasAppRuntime: Boolean;
 var
   Code: Integer;
 begin
   Result := Exec('powershell.exe',
-    '-NoProfile -ExecutionPolicy Bypass -Command "if (Get-AppxPackage -Name Microsoft.WindowsAppRuntime.2 | Where-Object { $_.Architecture -eq ''X64'' -and $_.Version -ge [version]''2.6.0.0'' }) { exit 0 } else { exit 1 }"',
+    '-NoProfile -ExecutionPolicy Bypass -Command "if (Get-AppxPackage -Name Microsoft.WindowsAppRuntime.2 | Where-Object { $_.Architecture -eq ''' + AppxArch + ''' -and $_.Version -ge [version]''2.6.0.0'' }) { exit 0 } else { exit 1 }"',
     '', SW_HIDE, ewWaitUntilTerminated, Code) and (Code = 0);
 end;
 
@@ -187,8 +219,8 @@ begin
   T.AutoSize := True;
   T.Caption := CustomMessage('NeedText');
   Y := T.Top + T.Height + ScaleY(16);
-  if NeedDotNet then Y := AddComponent('.NET 10 Runtime (x64)', DotNetLicense, Y);
-  if NeedRuntime then Y := AddComponent('Windows App Runtime 2.6 (x64)', AppRuntimeLicense, Y);
+  if NeedDotNet then Y := AddComponent('.NET 10 Runtime (' + Arch + ')', DotNetLicense, Y);
+  if NeedRuntime then Y := AddComponent('Windows App Runtime 2.6 (' + Arch + ')', AppRuntimeLicense, Y);
   AcceptBox := TNewCheckBox.Create(NeedPage);
   AcceptBox.Parent := NeedPage.Surface;
   AcceptBox.Top := Y + ScaleY(12);
@@ -215,8 +247,8 @@ begin
   if CurPageID <> wpReady then Exit;
   if not (NeedDotNet or NeedRuntime) then Exit;
   DownloadPage.Clear;
-  if NeedDotNet then DownloadPage.Add(DotNetUrl, 'dotnet-runtime-win-x64.exe', '');
-  if NeedRuntime then DownloadPage.Add(AppRuntimeUrl, 'windowsappruntimeinstall-x64.exe', '');
+  if NeedDotNet then DownloadPage.Add(DotNetUrl, 'dotnet-runtime.exe', '');
+  if NeedRuntime then DownloadPage.Add(AppRuntimeUrl, 'windowsappruntimeinstall.exe', '');
   DownloadPage.Show;
   try
     try
@@ -229,9 +261,9 @@ begin
     if NeedDotNet then
     begin
       DownloadPage.SetText(FmtMessage(CustomMessage('Prereq'), ['.NET 10 Runtime']), '');
-      if not RunElevated(ExpandConstant('{tmp}\dotnet-runtime-win-x64.exe'), '/install /quiet /norestart') or not HasDotNet then
+      if not RunElevated(ExpandConstant('{tmp}\dotnet-runtime.exe'), '/install /quiet /norestart') or not HasDotNet then
       begin
-        SuppressibleMsgBox(FmtMessage(CustomMessage('PrereqFailed'), ['.NET 10 Runtime (x64)', 'https://dotnet.microsoft.com/download/dotnet/10.0']), mbError, MB_OK, IDOK);
+        SuppressibleMsgBox(FmtMessage(CustomMessage('PrereqFailed'), ['.NET 10 Runtime (' + Arch + ')', 'https://dotnet.microsoft.com/download/dotnet/10.0']), mbError, MB_OK, IDOK);
         Result := False;
         Exit;
       end;
@@ -239,14 +271,32 @@ begin
     if NeedRuntime then
     begin
       DownloadPage.SetText(FmtMessage(CustomMessage('Prereq'), ['Windows App Runtime 2.6']), '');
-      if not RunElevated(ExpandConstant('{tmp}\windowsappruntimeinstall-x64.exe'), '--quiet') or not HasAppRuntime then
+      if not RunElevated(ExpandConstant('{tmp}\windowsappruntimeinstall.exe'), '--quiet') or not HasAppRuntime then
       begin
-        SuppressibleMsgBox(FmtMessage(CustomMessage('PrereqFailed'), ['Windows App Runtime 2.6 (x64)', 'https://learn.microsoft.com/windows/apps/windows-app-sdk/downloads']), mbError, MB_OK, IDOK);
+        SuppressibleMsgBox(FmtMessage(CustomMessage('PrereqFailed'), ['Windows App Runtime 2.6 (' + Arch + ')', 'https://learn.microsoft.com/windows/apps/windows-app-sdk/downloads']), mbError, MB_OK, IDOK);
         Result := False;
         Exit;
       end;
     end;
   finally
     DownloadPage.Hide;
+  end;
+end;
+
+
+// Uninstalling: the settings of the app (%AppData%\HeMi\HeMiDock) are deleted or kept, as the user chooses (a quiet
+// uninstall keeps them). %AppData%\HeMi goes too when no other HeMi app has anything there.
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+var
+  Dir: String;
+begin
+  if CurUninstallStep <> usPostUninstall then Exit;
+  Dir := ExpandConstant('{userappdata}\HeMi\HeMiDock');
+  if not DirExists(Dir) then Exit;
+  if UninstallSilent then Exit;
+  if MsgBox('Delete the settings of HeMiDock too?' + #13#10#13#10 + 'Keep them to use them again when you install HeMiDock later.', mbConfirmation, MB_YESNO or MB_DEFBUTTON2) = IDYES then
+  begin
+    DelTree(Dir, True, True, True);
+    RemoveDir(ExpandConstant('{userappdata}\HeMi'));
   end;
 end;

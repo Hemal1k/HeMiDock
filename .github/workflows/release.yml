@@ -44,4 +44,4 @@ jobs:
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "${{ github.event.release.tag_name }}" build/dist/HeMiDock-Setup.exe build/dist/HeMiDock-Portable.zip build/dist/SHA256SUMS.txt --clobber --repo "${{ github.repository }}"
+        run: gh release upload "${{ github.event.release.tag_name }}" build/dist/HeMiDock-Setup.exe build/dist/HeMiDock-Portable.zip build/dist/HeMiDock-Portable-arm64.zip build/dist/SHA256SUMS.txt --clobber --repo "${{ github.repository }}"

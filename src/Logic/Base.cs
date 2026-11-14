@@ -3,9 +3,9 @@
 namespace HeMiDock;
 
 /// <summary>
-/// The data folder %AppData%\HeMiDock. The test builds before 1.0 kept theirs in %AppData%\HeMiDock.WinUI: on the first
-/// start it becomes %AppData%\HeMiDock (an older folder of that name is kept aside as HeMiDock.old). When the move cannot be
-/// done (a file in use), the old place is used until the next start.
+/// The data folder %AppData%\HeMi\HeMiDock – all HeMi apps keep their settings under %AppData%\HeMi (since 1.7.0). The
+/// folder of the older versions (%AppData%\HeMiDock, before 1.0 %AppData%\HeMiDock.WinUI) is moved there at the first
+/// start. When the move cannot be done (a file in use), the old place is used until the next start.
 /// </summary>
 static class DataFolder
 {
@@ -13,19 +13,46 @@ static class DataFolder
 
     public static string Resolve()
     {
-        string folder = Path.Combine(Roaming, "HeMiDock"), beta = Path.Combine(Roaming, "HeMiDock.WinUI"), aside = Path.Combine(Roaming, "HeMiDock.old");
-        if (!Directory.Exists(beta)) return folder;
+        string folder = Path.Combine(Roaming, "HeMi", "HeMiDock");
+        var olds = new[] { Path.Combine(Roaming, "HeMiDock"), Path.Combine(Roaming, "HeMiDock.WinUI") };
+        if (!Directory.Exists(folder))
+            foreach (var old in olds)
+            {
+                if (!Directory.Exists(old)) continue;
+                try
+                {
+                    Directory.CreateDirectory(Path.Combine(Roaming, "HeMi"));
+                    Directory.Move(old, folder);
+                    break;
+                }
+                catch { return old; }
+            }
+        FixPaths(folder, olds);
+        return folder;
+    }
+
+    /// <summary>
+    /// The settings hold full paths into the data folder (the shortcuts of the dock in Pinned, own icons …): after the move
+    /// they point to the new place (checked at every start – a few small files).
+    /// </summary>
+    static void FixPaths(string folder, string[] olds)
+    {
         try
         {
-            if (Directory.Exists(folder))
+            if (!Directory.Exists(folder)) return;
+            foreach (var file in Directory.GetFiles(folder, "*.json"))
             {
-                if (Directory.Exists(aside)) aside += " " + DateTime.Now.ToString("yyyy-MM-dd HH-mm");
-                Directory.Move(folder, aside);
+                string text = File.ReadAllText(file), fixedText = text;
+                foreach (var old in olds)
+                {
+                    // as JSON writes it (\\) and as it is
+                    fixedText = fixedText.Replace(old.Replace(@"\", @"\\") + @"\\", folder.Replace(@"\", @"\\") + @"\\", StringComparison.OrdinalIgnoreCase)
+                                         .Replace(old + @"\", folder + @"\", StringComparison.OrdinalIgnoreCase);
+                }
+                if (fixedText != text) File.WriteAllText(file, fixedText);
             }
-            Directory.Move(beta, folder);
-            return folder;
         }
-        catch { return Directory.Exists(beta) ? beta : folder; }
+        catch { }
     }
 }
 

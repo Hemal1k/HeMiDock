@@ -277,7 +277,14 @@ static class TrayPins
         catch (Exception ex) { Log.Write("TrayPins.Save", ex); }
     }
 
-    public static bool IsVisible(NotifyIcon n) => n != null && !n.IsHidden && !Duplicates.Contains(n.GUID.ToString()) && !IsUpdateIcon(n) && !IsSecurityShownApart(n);
+    public static bool IsVisible(NotifyIcon n) => n != null && !n.IsHidden && !Duplicates.Contains(n.GUID.ToString()) && !IsUpdateIcon(n) && !IsSecurityShownApart(n) && !IsLauncher(n);
+
+    /// <summary>
+    /// HeMi Launcher: its new versions are among the status icons of the dock (the sign of updates, right click opens the
+    /// launcher), so its own icon is left out of the area while the status signs are on.
+    /// </summary>
+    static bool IsLauncher(NotifyIcon n) =>
+        DockSettings.Current.ShowStatusSigns && Path.GetFileName(n.Path ?? "").Equals("HeMiLauncher.exe", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>Windows Security drawn among the status icons (its shield): its own icon is left out of the area then.</summary>
     static bool IsSecurityShownApart(NotifyIcon n) =>

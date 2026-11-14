@@ -288,6 +288,14 @@ sealed class StatusParts
     void ShowAppUpdate()
     {
         _appUpdateGlyph.FontSize = S.StatusIconSize;
+        if (HeMiLauncher.Present)
+        {
+            // what HeMi Launcher found for all HeMi apps
+            var found = HeMiLauncher.Updates;
+            _appUpdate.Visibility = V(found.Count > 0);
+            if (found.Count > 0) ToolTipService.SetToolTip(_appUpdate, L.T("New versions in HeMi Launcher:") + "\n" + string.Join("\n", found) + "\n" + L.T("Right click: open HeMi Launcher"));
+            return;
+        }
         var release = Updater.Available;
         _appUpdate.Visibility = V(release != null);
         if (release != null) ToolTipService.SetToolTip(_appUpdate, L.T("HeMiDock {0} is available.", release.Version.ToString(3)) + "\n" + L.T("Right click: install"));
@@ -296,6 +304,7 @@ sealed class StatusParts
     /// <summary>The menu of the sign of a new version: install it (or download it, portable), see what is new, skip it.</summary>
     static void AppUpdateMenu(FrameworkElement at)
     {
+        if (HeMiLauncher.Present) { HeMiLauncher.Open(); return; }               // HeMi Launcher shows and installs them
         if (Updater.Available is not { } release) return;
         var menu = new MenuFlyout();
         void Add(string text, Action click, bool bold = false)

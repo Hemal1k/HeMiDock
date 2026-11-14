@@ -1,8 +1,8 @@
-<Project>
+﻿<Project>
 
   <!-- HeMiDock in WinUI 3, unpackaged, one project: the app here, its logic in Logic\, the taskbar part of the shell in
        Shell\ (with the parts of ManagedShell, Apache License 2.0, see Shell\ManagedShell\LICENSE and NOTICE). Debug and
-       Release need the .NET 10 Runtime and the Windows App Runtime 2.6 (x64) installed on the PC; the portable release
+       Release need the .NET 10 Runtime and the Windows App Runtime 2.6 installed on the PC; the portable release
        (-p:Portable=true, below) carries both. -->
 
   <!-- everything the build makes (bin, obj, publish) goes into build\ beside src\, nothing into the folder of the source;
@@ -24,10 +24,10 @@
     <AssemblyName>HeMiDock</AssemblyName>
     <Product>HeMiDock</Product>
     <!-- big changes +1, smaller +0.1, really small +0.0.1 -->
-    <Version>1.6.1</Version>
+    <Version>1.7.0</Version>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
-    <Platforms>x64</Platforms>
+    <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == ''">win-x64</RuntimeIdentifier>
+    <Platforms>x64;ARM64</Platforms>
     <UseWinUI>true</UseWinUI>
     <WindowsPackageType>None</WindowsPackageType>
     <!-- only the app: .NET and the Windows App Runtime are installed (a Debug build carrying both had some 600 files) -->
@@ -91,8 +91,8 @@
         Or $([System.String]::Copy('%(Filename)').StartsWith('Microsoft.Windows.Workloads')) Or '%(Filename)%(Extension)' == 'Microsoft.Graphics.Imaging.dll'
         Or '%(Filename)' == 'RestartAgent' Or '%(Filename)' == 'PushNotificationsLongRunningTask.ProxyStub'" />
       <!-- the full licenses of what the portable release carries (Settings → About → Licenses names them) -->
-      <ResolvedFileToPublish Include="$(NuGetPackageRoot)microsoft.netcore.app.runtime.win-x64\$(BundledNETCoreAppPackageVersion)\LICENSE.TXT" RelativePath="Licenses\.NET - LICENSE.txt" CopyToPublishDirectory="PreserveNewest" />
-      <ResolvedFileToPublish Include="$(NuGetPackageRoot)microsoft.netcore.app.runtime.win-x64\$(BundledNETCoreAppPackageVersion)\THIRD-PARTY-NOTICES.TXT" RelativePath="Licenses\.NET - THIRD-PARTY-NOTICES.txt" CopyToPublishDirectory="PreserveNewest" />
+      <ResolvedFileToPublish Include="$(NuGetPackageRoot)microsoft.netcore.app.runtime.$(RuntimeIdentifier)\$(BundledNETCoreAppPackageVersion)\LICENSE.TXT" RelativePath="Licenses\.NET - LICENSE.txt" CopyToPublishDirectory="PreserveNewest" />
+      <ResolvedFileToPublish Include="$(NuGetPackageRoot)microsoft.netcore.app.runtime.$(RuntimeIdentifier)\$(BundledNETCoreAppPackageVersion)\THIRD-PARTY-NOTICES.TXT" RelativePath="Licenses\.NET - THIRD-PARTY-NOTICES.txt" CopyToPublishDirectory="PreserveNewest" />
       <ResolvedFileToPublish Include="$(NuGetPackageRoot)microsoft.windowsappsdk\2.6.4\license.txt" RelativePath="Licenses\Windows App SDK - license.txt" CopyToPublishDirectory="PreserveNewest" />
       <ResolvedFileToPublish Include="$(NuGetPackageRoot)microsoft.windowsappsdk\2.6.4\NOTICE.txt" RelativePath="Licenses\Windows App SDK - NOTICE.txt" CopyToPublishDirectory="PreserveNewest" />
       <ResolvedFileToPublish Include="$(NuGetPackageRoot)microsoft.windowsappsdk.winui\2.6.4\NOTICE.txt" RelativePath="Licenses\WinUI - NOTICE.txt" CopyToPublishDirectory="PreserveNewest" />
