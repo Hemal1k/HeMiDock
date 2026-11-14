@@ -38,6 +38,27 @@ sealed partial class SettingsWindow
         Depends(AddHint(general, "On by itself: the graphics card of this PC probably cannot draw the transparency."), () => DockSettings.LegacyGpu);
         ChoiceRow(general, "Notification position", "At the clock, top right with the top bar", nameof(DockSettings.ToastPosition),
             "Automatic", "At the clock", "Top right", "Top left", "Bottom right", "Bottom left");
+        Header(general, "Updates");
+        ToggleRow(general, "Check for updates automatically", null, nameof(DockSettings.CheckUpdates));
+        var check = new Button { Content = L.T("Check now") };
+        var checkText = new TextBlock { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 12, 0), Foreground = ThemeBrush.Get("TextFillColorSecondaryBrush") };
+        check.Click += async (_, _) =>
+        {
+            check.IsEnabled = false;
+            checkText.Text = L.T("Checking…");
+            var release = await Updater.CheckAsync(quiet: false);
+            check.IsEnabled = true;
+            if (release == null) checkText.Text = L.T("GitHub could not be reached.");
+            else if (release.Version <= Updater.Current) checkText.Text = L.T("HeMiDock is up to date.");
+            else
+            {
+                checkText.Text = L.T("HeMiDock {0} is available.", release.Version.ToString(3));
+                var install = new Button { Content = L.T(Updater.Installed ? "Install" : "Download") };
+                install.Click += (_, _) => _ = Updater.InstallAsync(release);
+                if (check.Parent is StackPanel row && row.Children.Count == 2) row.Children.Add(install);
+            }
+        };
+        Card(general, "Check for updates", null, new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, Children = { checkText, check } });
         Header(general, "Colors and effects");
         ChoiceRow(general, "App theme", null, nameof(DockSettings.ThemeMode), "Automatic", "Light", "Dark");
         // the mode of Windows itself: light or dark at once, or by the time of day
@@ -390,27 +411,6 @@ sealed partial class SettingsWindow
         report.Click += (_, _) => Fg.Open(Updater.IssuesUrl);
         Card(about, "Report a problem", null, report);
 
-        Header(about, "Updates");
-        ToggleRow(about, "Check for updates automatically", null, nameof(DockSettings.CheckUpdates));
-        var check = new Button { Content = L.T("Check now") };
-        var checkText = new TextBlock { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 12, 0), Foreground = ThemeBrush.Get("TextFillColorSecondaryBrush") };
-        check.Click += async (_, _) =>
-        {
-            check.IsEnabled = false;
-            checkText.Text = L.T("Checking…");
-            var release = await Updater.CheckAsync(quiet: false);
-            check.IsEnabled = true;
-            if (release == null) checkText.Text = L.T("GitHub could not be reached.");
-            else if (release.Version <= Updater.Current) checkText.Text = L.T("HeMiDock is up to date.");
-            else
-            {
-                checkText.Text = L.T("HeMiDock {0} is available.", release.Version.ToString(3));
-                var install = new Button { Content = L.T(Updater.Installed ? "Install" : "Download") };
-                install.Click += (_, _) => _ = Updater.InstallAsync(release);
-                if (check.Parent is StackPanel row && row.Children.Count == 2) row.Children.Add(install);
-            }
-        };
-        Card(about, "Check for updates", null, new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, Children = { checkText, check } });
         var licenses = new Button { Content = L.T("Open") };
         // the file was never part of the build: the button opened nothing
         licenses.Click += (_, _) => Fg.Open(System.IO.Path.Combine(AppContext.BaseDirectory, "Assets", "ThirdPartyNotices.txt"));

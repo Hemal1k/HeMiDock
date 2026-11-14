@@ -175,6 +175,8 @@ sealed class StatusParts
     readonly FontIcon _place = Glyph("");
     // Windows Security: a shield with a dot of the state (yellow: an action recommended, red: needed); its own clicks
     readonly FontIcon _shield = Glyph("");
+    // a check in the shield while all is well (as the icon of Windows Security); the shield with "!" when it wants something
+    readonly FontIcon _shieldCheck = new() { Glyph = "", FontSize = 8, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 1, 0, 0), IsHitTestVisible = false };
     readonly Ellipse _shieldDot = new() { Width = 6, Height = 6, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, -2, -1), IsHitTestVisible = false, Visibility = Visibility.Collapsed };
     readonly Grid _security = new() { VerticalAlignment = VerticalAlignment.Center, Visibility = Visibility.Collapsed, Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent) };
     readonly Grid _updateIcon = new() { VerticalAlignment = VerticalAlignment.Center, Visibility = Visibility.Collapsed, Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent) };
@@ -217,6 +219,7 @@ sealed class StatusParts
             Margin = new Thickness(0, 0, -1, -1), IsHitTestVisible = false, Fill = ThemeBrush.Get("AccentFillColorDefaultBrush")
         });
         _security.Children.Add(_shield);
+        _security.Children.Add(_shieldCheck);
         _security.Children.Add(_shieldDot);
         // left: the control center like the other status icons; right: the menu of Windows Security (not the control center,
         // which the right button of the status icons opens otherwise)
@@ -336,6 +339,8 @@ sealed class StatusParts
         _security.Visibility = V(item != null);
         if (item == null) return;
         int state = SecurityStatus.StateOf(item.Picture);
+        _shield.Glyph = state > 0 ? "" : "";
+        _shieldCheck.Visibility = V(state == 0);
         _shieldDot.Visibility = V(state > 0);
         _shieldDot.Fill = ThemeBrush.Get(state == 2 ? "SystemFillColorCriticalBrush" : "SystemFillColorCautionBrush");
         ToolTipService.SetToolTip(_security, item.Title);
@@ -351,6 +356,7 @@ sealed class StatusParts
     public void Show(StatusSnapshot d)
     {
         foreach (var g in new[] { _privacy, _place, _dnd, _vpn, _micMute, _weather, _update, _shield }) g.FontSize = S.StatusIconSize;
+        _shieldCheck.FontSize = Math.Round(S.StatusIconSize * 0.6);
         ShowSecurity(d.Security);
         _place.Visibility = V(d.Place.Count > 0);
         _updateIcon.Visibility = V(d.UpdateRestart);

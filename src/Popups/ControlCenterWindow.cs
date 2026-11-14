@@ -59,6 +59,7 @@ sealed class ControlCenterWindow : PopupWindow
         _pageView.Children.Add(_page);
         Grid.SetRow(_pageFooter, 2);
         _pageView.Children.Add(_pageFooter);
+        _host.Children.Add(_focusSink);
         _host.Children.Add(_main);
         _host.Children.Add(_pageView);
         Content = new Border { Width = 372, Padding = new Thickness(14), Child = _host };
@@ -393,7 +394,17 @@ sealed class ControlCenterWindow : PopupWindow
     }
 
     bool _visibleNow;
-    protected override void Shown() => _visibleNow = true;
+    /// <summary>
+    /// Takes the focus when the pop-up opens: otherwise WinUI gives it to the first tile, and after Win+A (a key) it showed
+    /// the keyboard frame around it though nobody pressed Tab. Tab still goes on to the first tile.
+    /// </summary>
+    readonly ContentControl _focusSink = new() { IsTabStop = true, UseSystemFocusVisuals = false, Width = 0, Height = 0, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top };
+
+    protected override void Shown()
+    {
+        _visibleNow = true;
+        _focusSink.Focus(FocusState.Programmatic);
+    }
 
     void Footer(string text, string uri) => _pageFooter.Content = SettingsLink(text, uri);
 

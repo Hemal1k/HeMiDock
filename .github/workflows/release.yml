@@ -29,8 +29,6 @@ jobs:
         shell: pwsh
         run: ./release.ps1
 
-      # Code signing (SignPath Foundation) comes here once the project is accepted: the files of build/dist are sent to
-      # SignPath, signed and put back before they are attached.
 
       - name: Checksums
         shell: pwsh

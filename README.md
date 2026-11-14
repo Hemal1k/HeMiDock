@@ -10,7 +10,7 @@ and dark.
 
 ![HeMiDock](.github/screenshot.png)
 
-> HeMiDock is in beta and not signed yet, so Windows SmartScreen may warn the first time it is installed (More info → Run anyway).
+> The downloads are not code-signed, so Windows SmartScreen may warn the first time (More info → Run anyway). Each release has `SHA256SUMS.txt` to check them.
 
 ## Download
 
