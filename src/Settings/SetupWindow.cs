@@ -379,7 +379,7 @@ sealed class SetupWindow : Window
                 Choice("Color palette", nameof(DockSettings.AccentMode), "Automatic", "Custom"),
                 Choice("Transparency", nameof(DockSettings.GlassMode), "Automatic", "On", "Off"),
                 Slide("Transparency intensity", nameof(DockSettings.Transparency), 0, 90),
-                Toggle("Highlight of windows and the dock", null, nameof(DockSettings.DockOutline)),
+                Toggle("Turn off the highlight of windows and the dock", null, nameof(DockSettings.NoOutline)),
                 Choice("Animation speed", nameof(DockSettings.AnimationSpeed), "Slow", "Normal", "Fast", "Off"),
             }
         };

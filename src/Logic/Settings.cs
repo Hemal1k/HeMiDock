@@ -689,13 +689,16 @@ public partial class DockSettings : INotifyPropertyChanged
 
     // detailed look and behaviour – the defaults are exactly the original look
     double _dockShadow = 35, _endPadding = 3, _magnificationSpread = 2.5, _autoHideDelay = 0.8;
-    bool _dockOutline, _showAppNames = true;
+    // the lines of Windows stay by default (a new user switches them off on purpose); a saved setting keeps its value
+    bool _dockOutline = true, _showAppNames = true;
 
     /// <summary>Strength of the shadow under the dock (%).</summary>
     public double DockShadow { get => _dockShadow; set => Set(ref _dockShadow, Math.Clamp(value, 0, 100)); }
     /// <summary>Thin outline around the dock.</summary>
     /// <summary>The line around the dock and around all windows of Windows (see <see cref="WindowOutlines"/>).</summary>
     public bool DockOutline { get => _dockOutline; set => Set(ref _dockOutline, value); }
+    /// <summary>The switch in the settings: "Turn off the outline of windows and the dock" (the other way round).</summary>
+    [NotStored] public bool NoOutline { get => !DockOutline; set { DockOutline = !value; } }
     /// <summary>Room between the ends of the dock and the first / last icon (px).</summary>
     public double EndPadding { get => _endPadding; set => Set(ref _endPadding, Math.Clamp(value, 0, 32)); }
     /// <summary>How many icons around the cursor grow with the magnification (width of the wave, in icons).</summary>

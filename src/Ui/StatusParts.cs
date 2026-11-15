@@ -168,9 +168,11 @@ sealed class StatusParts
     // updates of Windows wait for a restart: a circular arrow with a dot of the accent colour (the icon of Windows for it is
     // drawn by its own taskbar only, never given to another one)
     readonly FontIcon _update = Glyph("");
-    // a new version of HeMiDock on GitHub: an arrow down with a dot of the accent colour; right click: install it
+    // a new version of a HeMi app: an "H" with a small arrow down in the accent colour (not the plain arrow of Downloads);
+    // a click opens HeMi Launcher (without it: the menu to install HeMiDock)
     readonly Grid _appUpdate = new() { VerticalAlignment = VerticalAlignment.Center, Visibility = Visibility.Collapsed, Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent) };
-    readonly FontIcon _appUpdateGlyph = Glyph("");
+    // drawn as the icon of HeMi Launcher's website button: a rounded square with "H" and the dot, beside it a small arrow down
+    readonly Viewbox _appUpdateIcon = new() { IsHitTestVisible = false, VerticalAlignment = VerticalAlignment.Center };
     // an app uses the location: its own orange pin beside the one of the microphone / camera (as Windows shows it)
     readonly FontIcon _place = Glyph("");
     // Windows Security: a shield with a dot of the state (yellow: an action recommended, red: needed); its own clicks
@@ -226,12 +228,9 @@ sealed class StatusParts
         _security.RightTapped += (_, e) => { e.Handled = true; TrayView.SecurityMenu(_security); };
         // the sign of updates waiting: left the control center, right a menu to finish them
         _updateIcon.RightTapped += (_, e) => { e.Handled = true; UpdateMenu(_updateIcon); };
-        _appUpdate.Children.Add(_appUpdateGlyph);
-        _appUpdate.Children.Add(new Ellipse
-        {
-            Width = 5, Height = 5, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Bottom,
-            Margin = new Thickness(0, 0, -1, -1), IsHitTestVisible = false, Fill = ThemeBrush.Get("AccentFillColorDefaultBrush")
-        });
+        _appUpdateIcon.Child = AppUpdateDrawing();
+        _appUpdate.Children.Add(_appUpdateIcon);
+        _appUpdate.Tapped += (_, e) => { e.Handled = true; AppUpdateMenu(_appUpdate); };
         _appUpdate.RightTapped += (_, e) => { e.Handled = true; AppUpdateMenu(_appUpdate); };
         foreach (var e in new UIElement[] { _appUpdate, _updateIcon, _security, _privacy, _place, _dnd, _vpn, _micMute, _weather, _weatherText, _net, _btPanel, _volPanel, _batPanel }) _icons.Children.Add(e);
         if (host != null) { Button = host; host.Content = _icons; }      // the dock: its own button (its place, click and wheel)
@@ -284,21 +283,46 @@ sealed class StatusParts
 
     static Visibility V(bool on) => on ? Visibility.Visible : Visibility.Collapsed;
 
+    /// <summary>
+    /// The icon of new versions on a 21 × 16 canvas: the square with "H" and the dot of the HeMi website (as the web button
+    /// of HeMi Launcher draws it, in the colour of the text) and a small arrow down on its right.
+    /// </summary>
+    static Canvas AppUpdateDrawing()
+    {
+        Brush ink = ThemeBrush.Get("TextFillColorPrimaryBrush");
+        Microsoft.UI.Xaml.Shapes.Path Stroke(string data, double width) => new()
+        {
+            Data = (Geometry)Microsoft.UI.Xaml.Markup.XamlBindingHelper.ConvertValue(typeof(Geometry), data),
+            Stroke = ink, StrokeThickness = width, StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round, StrokeLineJoin = PenLineJoin.Round
+        };
+        var canvas = new Canvas { Width = 21, Height = 16 };
+        canvas.Children.Add(Stroke("M4.5,0.7 L11.5,0.7 A3.8,3.8 0 0 1 15.3,4.5 L15.3,11.5 A3.8,3.8 0 0 1 11.5,15.3 L4.5,15.3 A3.8,3.8 0 0 1 0.7,11.5 L0.7,4.5 A3.8,3.8 0 0 1 4.5,0.7 Z", 1.3));
+        canvas.Children.Add(Stroke("M5.25,4.25 L5.25,11.75 M10.75,4.25 L10.75,11.75 M5.25,8 L10.75,8", 1.7));
+        var dot = new Ellipse { Width = 2.4, Height = 2.4, Fill = ink };
+        Canvas.SetLeft(dot, 11.55);
+        Canvas.SetTop(dot, 2.05);
+        canvas.Children.Add(dot);
+        canvas.Children.Add(Stroke("M18.6,7 L18.6,14.6 M16.6,12.6 L18.6,14.6 L20.6,12.6", 1.4));
+        return canvas;
+    }
+
     /// <summary>The sign of a new version of HeMiDock (found on GitHub) with its tooltip.</summary>
     void ShowAppUpdate()
     {
-        _appUpdateGlyph.FontSize = S.StatusIconSize;
+        double size = S.StatusIconSize;
+        _appUpdateIcon.Height = size;
+        _appUpdateIcon.Width = Math.Round(size * 21 / 16);
         if (HeMiLauncher.Present)
         {
             // what HeMi Launcher found for all HeMi apps
             var found = HeMiLauncher.Updates;
             _appUpdate.Visibility = V(found.Count > 0);
-            if (found.Count > 0) ToolTipService.SetToolTip(_appUpdate, L.T("New versions in HeMi Launcher:") + "\n" + string.Join("\n", found) + "\n" + L.T("Right click: open HeMi Launcher"));
+            if (found.Count > 0) ToolTipService.SetToolTip(_appUpdate, L.T("New versions in HeMi Launcher:") + "\n" + string.Join("\n", found) + "\n" + L.T("Click: open HeMi Launcher"));
             return;
         }
         var release = Updater.Available;
         _appUpdate.Visibility = V(release != null);
-        if (release != null) ToolTipService.SetToolTip(_appUpdate, L.T("HeMiDock {0} is available.", release.Version.ToString(3)) + "\n" + L.T("Right click: install"));
+        if (release != null) ToolTipService.SetToolTip(_appUpdate, L.T("HeMiDock {0} is available.", release.Version.ToString(3)) + "\n" + L.T("Click: install"));
     }
 
     /// <summary>The menu of the sign of a new version: install it (or download it, portable), see what is new, skip it.</summary>

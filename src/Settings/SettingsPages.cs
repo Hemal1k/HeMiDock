@@ -53,7 +53,7 @@ sealed partial class SettingsWindow
         Card(general, "Setup guide", null, guide);                     // the looks are chosen there (the row of looks here was taken away)
         ChoiceRow(general, "Language", null, nameof(DockSettings.Language), "Automatic", "English", "Čeština");
         ToggleRow(general, "Start at sign-in", null, nameof(DockSettings.StartAtSignIn));
-        ToggleRow(general, "Highlight of windows and the dock", null, nameof(DockSettings.DockOutline));
+        ToggleRow(general, "Turn off the highlight of windows and the dock", null, nameof(DockSettings.NoOutline));
         ToggleRow(general, "Advanced editing", "Move the parts of the dock and the top bar with the mouse and change their size, rename apps in Start and change their icons",
             nameof(DockSettings.DockEditMode));
         // one choice for both: always, or only while the battery is low – that one only on a device with a battery
