@@ -295,7 +295,7 @@ public partial class DockSettings : INotifyPropertyChanged
     /// <summary>Width of the calendar and notifications (px), changed with the mouse in edit mode.</summary>
     public double CalendarWidth { get => _calendarWidth; set => Set(ref _calendarWidth, Math.Clamp(value, 340, 760)); }
     /// <summary>Height of the notifications card (px; 0 = by its content), changed with the mouse in edit mode.</summary>
-    public double CalendarNotifHeight { get => _calendarNotifHeight; set => Set(ref _calendarNotifHeight, value <= 0 ? 0 : Math.Clamp(value, 100, 700)); }
+    public double CalendarNotifHeight { get => _calendarNotifHeight; set => Set(ref _calendarNotifHeight, value <= 0 ? 0 : Math.Clamp(value, 130, 700)); }
     int _calendarFirstDay, _clockLine;
     /// <summary>First day of the week in the calendar: 0 = by the region of Windows, 1 = Monday, 2 = Sunday.</summary>
     public int CalendarFirstDay { get => _calendarFirstDay; set => Set(ref _calendarFirstDay, Math.Clamp(value, 0, 2)); }

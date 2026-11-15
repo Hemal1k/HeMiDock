@@ -156,7 +156,7 @@ sealed class CalendarWindow : PopupWindow
         {
             bool down = GripDown;
             _panel.Width = Math.Clamp(_panel.Width - e.HorizontalChange, 340, 760);
-            double h = Math.Clamp(_notifCard.ActualHeight + (down ? e.VerticalChange : -e.VerticalChange), 100, 700);
+            double h = Math.Clamp(_notifCard.ActualHeight + (down ? e.VerticalChange : -e.VerticalChange), MinNotifHeight(), 700);
             _notifCard.MinHeight = _notifCard.Height = h;
             _notifScroll.MaxHeight = Math.Max(60, h - 50);
             Place();
@@ -174,6 +174,20 @@ sealed class CalendarWindow : PopupWindow
 
     /// <summary>The dock at the top: the window grows down, the grip sits at its bottom.</summary>
     static bool GripDown => (App.Anchor ?? App.Dock)?.AnchorFor("calendar")?.Edge == 3;
+
+    /// <summary>The lowest height of the notifications card: its head and "No new notifications" – or the first notification – still whole.</summary>
+    double MinNotifHeight()
+    {
+        double content;
+        if (_notifScroll.Visibility == Visibility.Visible && _notifications.Children.FirstOrDefault() is FrameworkElement first)
+            content = first.ActualHeight + first.Margin.Top + first.Margin.Bottom + _notifScroll.Margin.Top;
+        else
+        {
+            _empty.Measure(new Windows.Foundation.Size(double.PositiveInfinity, double.PositiveInfinity));
+            content = _empty.DesiredSize.Height;
+        }
+        return Math.Clamp(content + 34 + 16, 130, 700);               // + the head, the padding and the border
+    }
 
     /// <summary>The size set with the mouse in edit mode; the grip only shows in edit mode.</summary>
     void ApplySize()
@@ -539,6 +553,17 @@ sealed class CalendarWindow : PopupWindow
         bool any = _notifications.Children.Count > 0;
         _notifScroll.Visibility = _clearAll.Visibility = any ? Visibility.Visible : Visibility.Collapsed;
         _empty.Visibility = any ? Visibility.Collapsed : Visibility.Visible;
+        // a height set with the mouse: never lower than the first notification needs (it would be cut in half)
+        if (any && !double.IsNaN(_notifCard.Height) && _notifications.Children[0] is FrameworkElement first)
+        {
+            first.Measure(new Windows.Foundation.Size(Math.Max(100, _panel.Width - 44), double.PositiveInfinity));
+            double need = first.DesiredSize.Height + _notifScroll.Margin.Top + 50;
+            if (need > _notifCard.Height)
+            {
+                _notifCard.MinHeight = _notifCard.Height = need;
+                _notifScroll.MaxHeight = need - 50;
+            }
+        }
     }
 
     /// <summary>The icon of the app of a notification; Windows gives none for many classic programs – then the icon of the app of the same name from Start.</summary>
