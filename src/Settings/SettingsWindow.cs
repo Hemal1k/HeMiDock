@@ -244,7 +244,7 @@ sealed partial class SettingsWindow : Window
         description = description == null ? null : L.T(description);
         var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 16, 0) };
         text.Children.Add(new TextBlock { Text = title, TextWrapping = TextWrapping.Wrap });
-        if (!string.IsNullOrEmpty(description)) text.Children.Add(new TextBlock { Text = description, FontSize = 12, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 2, 0, 0), Foreground = ThemeBrush.Get("TextFillColorSecondaryBrush") });
+        // no descriptions under the items (the user, 2026-11-15): the title says enough; the search still finds them
         var grid = new Grid { ColumnDefinitions = { new ColumnDefinition(), new ColumnDefinition { Width = GridLength.Auto } } };
         grid.Children.Add(text);
         control.VerticalAlignment = VerticalAlignment.Center;

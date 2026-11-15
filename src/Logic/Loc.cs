@@ -1,4 +1,4 @@
-﻿using System.Globalization;
+using System.Globalization;
 
 namespace HeMiDock;
 
@@ -632,6 +632,22 @@ static class L
         ["Project on GitHub"] = "Projekt na GitHubu",
         ["Report a problem"] = "Nahlásit problém",
         ["Links"] = "Odkazy",
+        ["Quick controls"] = "Rychlé ovládání",
+        ["Brightness"] = "Jas",
+        ["Mute the sound"] = "Ztlumit zvuk",
+        ["Dark mode"] = "Tmavý režim",
+        ["Mute the microphone"] = "Ztlumit mikrofon",
+        ["Best power efficiency"] = "Nejlepší úspora energie",
+        ["Best performance"] = "Nejvyšší výkon",
+        ["Sound output"] = "Zvukový výstup",
+        ["Empty the Recycle Bin"] = "Vysypat koš",
+        ["Screenshot"] = "Snímek obrazovky",
+        ["Clear the clipboard history"] = "Vymazat historii schránky",
+        ["Open workspace {0}"] = "Otevřít pracovní prostor {0}",
+        ["Enter twice"] = "Dvakrát Enter",
+        ["Press Enter again to confirm"] = "Pro potvrzení stiskni Enter znovu",
+        ["Not available on this PC"] = "Na tomto PC není k dispozici",
+        ["No antivirus is on – the PC is not protected."] = "Žádný antivirus není zapnutý – PC není chráněné.",
         ["Updates"] = "Aktualizace",
         ["Check for updates automatically"] = "Automaticky hledat aktualizace",
         ["Check for updates"] = "Hledat aktualizace",

@@ -1,4 +1,4 @@
-﻿using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 
@@ -417,7 +417,6 @@ sealed partial class SettingsWindow
         Header(about, "HeMiDock");
         InfoRow(about, "Author", new TextBlock { Text = "Richard Hemala" });
         InfoRow(about, "Version", new TextBlock { Text = AppInfo.Version });
-        InfoRow(about, "Build date", new TextBlock { Text = AppInfo.BuildDate?.ToString("d", System.Globalization.CultureInfo.CurrentCulture) ?? "–" });
         // the links side by side in one card (as in the other HeMi apps), not a row with "Open" for each
         Header(about, "Links");
         // four equal buttons that always fit (HeMi Launcher has its place in General → Updates)

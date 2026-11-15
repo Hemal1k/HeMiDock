@@ -1,4 +1,4 @@
-﻿using System.Collections.Specialized;
+using System.Collections.Specialized;
 using System.IO;
 using System.ComponentModel;
 using System.Text.Json;
@@ -288,7 +288,7 @@ static class TrayPins
 
     /// <summary>Windows Security drawn among the status icons (its shield): its own icon is left out of the area then.</summary>
     static bool IsSecurityShownApart(NotifyIcon n) =>
-        DockSettings.Current.ShowSecurity && SecurityStatus.DefenderActive
+        DockSettings.Current.ShowSecurity && (SecurityStatus.DefenderActive || SecurityStatus.NoAntivirus)
         && n.Path?.EndsWith("SecurityHealthSystray.exe", StringComparison.OrdinalIgnoreCase) == true;
 
     /// <summary>

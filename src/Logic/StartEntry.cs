@@ -1,4 +1,4 @@
-﻿namespace HeMiDock;
+namespace HeMiDock;
 
 /// <summary>
 /// One item of Start and of the search: an app, a folder of apps, a setting, a file … – the data and what a click does.
@@ -15,6 +15,7 @@ sealed class StartEntry
     public bool IconIsFile { get; init; }
     public string Glyph { get; init; }
     public string OwnIcon { get; init; }              // own picture of a pinned app
+    public QuickControl Control { get; init; }        // a system control of the search (Kind = Control)
 
     public string Group { get; set; }
 

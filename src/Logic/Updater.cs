@@ -17,7 +17,8 @@ static class Updater
     public static string IssuesUrl => RepoUrl + "/issues";
     const string SetupAsset = "HeMiDock-Setup.exe";
 
-    public sealed record Release(Version Version, string Name, string Page, string SetupUrl);
+    /// <summary>A release: its installer and the checksums of its files (SHA256SUMS.txt, checked before the installer runs).</summary>
+    public sealed record Release(Version Version, string Name, string Page, string SetupUrl, string SumsUrl);
 
     /// <summary>A newer release than this dock (and not skipped); null when there is none.</summary>
     public static Release Available { get; private set; }
@@ -115,12 +116,14 @@ static class Updater
             var root = doc.RootElement;
             string tag = root.GetProperty("tag_name").GetString() ?? "";
             if (!Version.TryParse(tag.TrimStart('v', 'V'), out var version)) return null;
-            string setup = null;
+            string setup = null, sums = null;
             if (root.TryGetProperty("assets", out var assets))
                 foreach (var a in assets.EnumerateArray())
                     if (string.Equals(a.GetProperty("name").GetString(), SetupAsset, StringComparison.OrdinalIgnoreCase))
                         setup = a.GetProperty("browser_download_url").GetString();
-            var release = new Release(version, root.TryGetProperty("name", out var n) ? n.GetString() : tag, root.GetProperty("html_url").GetString(), setup);
+                    else if (string.Equals(a.GetProperty("name").GetString(), "SHA256SUMS.txt", StringComparison.OrdinalIgnoreCase))
+                        sums = a.GetProperty("browser_download_url").GetString();
+            var release = new Release(version, root.TryGetProperty("name", out var n) ? n.GetString() : tag, root.GetProperty("html_url").GetString(), setup, sums);
             bool newer = version > Current && !(quiet && DockSettings.Current.SkippedUpdate == version.ToString());
             Ui.Post(() => { Available = newer ? release : null; Changed?.Invoke(); });
             return release;
@@ -144,7 +147,7 @@ static class Updater
     public static async Task InstallAsync(Release release)
     {
         string mode = InstalledFor;
-        if (mode == null || release.SetupUrl == null) { Fg.Open(release.Page); return; }
+        if (mode == null || release.SetupUrl == null || release.SumsUrl == null) { Fg.Open(release.Page); return; }
         try
         {
             Host.ShowInfo?.Invoke(L.T("Downloading HeMiDock {0}…", release.Version.ToString(3)));
@@ -154,6 +157,17 @@ static class Updater
                 response.EnsureSuccessStatusCode();
                 await using var to = File.Create(file);
                 await response.Content.CopyToAsync(to);
+            }
+            // the installer runs only when it is exactly the file of the release (SHA256SUMS.txt of the same release)
+            string sums = await Http.GetStringAsync(release.SumsUrl);
+            string want = sums.Split('\n').Select(l => l.Trim().Split((char[])null, 2, StringSplitOptions.RemoveEmptyEntries))
+                .Where(p => p.Length == 2 && p[1].TrimStart('*').Equals(SetupAsset, StringComparison.OrdinalIgnoreCase)).Select(p => p[0].ToLowerInvariant()).FirstOrDefault();
+            string have;
+            using (var s = File.OpenRead(file)) have = Convert.ToHexString(await System.Security.Cryptography.SHA256.HashDataAsync(s)).ToLowerInvariant();
+            if (want == null || want != have)
+            {
+                File.Delete(file);
+                throw new InvalidDataException($"{SetupAsset}: the checksum does not match");
             }
             // for all users the installer asks for administrator rights itself (UAC); for the user it runs without them
             Process.Start(new ProcessStartInfo(file, $"/SILENT /SUPPRESSMSGBOXES /NORESTART /UPDATE {mode}") { UseShellExecute = true });

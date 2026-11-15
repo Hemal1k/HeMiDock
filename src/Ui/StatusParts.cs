@@ -1,4 +1,4 @@
-﻿using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
@@ -347,12 +347,19 @@ sealed class StatusParts
         var item = on ? ShellHost.SecurityIcon() : null;
         _security.Visibility = V(item != null);
         if (item == null) return;
-        int state = SecurityStatus.StateOf(item.Picture);
-        _shield.Glyph = state > 0 ? "" : "";
-        _shieldCheck.Visibility = V(state == 0);
-        _shieldDot.Visibility = V(state > 0);
-        _shieldDot.Fill = ThemeBrush.Get(state == 2 ? "SystemFillColorCriticalBrush" : "SystemFillColorCautionBrush");
-        ToolTipService.SetToolTip(_security, item.Title);
+        // 0 all is well, 1 an action recommended, 2 an action needed (a threat found…), 3 no antivirus on at all
+        int state = SecurityStatus.NoAntivirus ? 3 : SecurityStatus.StateOf(item.Picture);
+        _shield.Glyph = state is 1 or 2 ? "\uE730" : "\uEA18";          // the shield with "!" / the shield
+        _shieldCheck.Glyph = state == 3 ? "\uE711" : "\uE73E";           // inside: × / a check
+        _shieldCheck.Visibility = V(state is 0 or 3);
+        _shieldDot.Visibility = Visibility.Collapsed;
+        foreach (var g in new[] { _shield, _shieldCheck })
+        {
+            if (state == 0) g.ClearValue(IconElement.ForegroundProperty);
+            else g.Foreground = ThemeBrush.Get(state == 1 ? "SystemFillColorCautionBrush" : "SystemFillColorCriticalBrush");
+        }
+        string tip = state == 3 ? L.T("No antivirus is on – the PC is not protected.") : item.Title;
+        ToolTipService.SetToolTip(_security, tip);
     }
 
     /// <summary>Read in the background (see <see cref="StatusData"/>), only shown here.</summary>

@@ -400,6 +400,8 @@ static class WifiFallback
         string file = null;
         try
         {
+            // the name comes from any network nearby: with a quotation mark it could add arguments to netsh – refused
+            if (string.IsNullOrEmpty(n.Ssid) || n.Ssid.IndexOfAny(['"', '\r', '\n']) >= 0) return false;
             string ssid = System.Security.SecurityElement.Escape(n.Ssid);
             bool open = n.SecuritySettings.NetworkAuthenticationType is Windows.Networking.Connectivity.NetworkAuthenticationType.Open80211 or Windows.Networking.Connectivity.NetworkAuthenticationType.None;
             if (!open && !string.IsNullOrEmpty(key))

@@ -7,12 +7,15 @@ namespace HeMiDock;
 /// </summary>
 static class SecurityStatus
 {
-    static bool _active;
+    static bool _active, _none;
     static long _checkedAt = -1;
     static readonly object Gate = new();
 
     /// <summary>Microsoft Defender is on – as last read by <see cref="Refresh"/> (never asked on the thread of the interface).</summary>
     public static bool DefenderActive => _active;
+
+    /// <summary>No antivirus is on at all (Defender off and no other one): the shield shows it in red.</summary>
+    public static bool NoAntivirus => _none;
 
     /// <summary>Asks the Security Center again, at most once a minute (with the reading of the status icons, in the background).</summary>
     public static bool Refresh()
@@ -20,17 +23,20 @@ static class SecurityStatus
         {
             lock (Gate)
             {
-                if (_checkedAt >= 0 && Environment.TickCount64 - _checkedAt < 60_000) return _active;
+                if (_checkedAt >= 0 && Environment.TickCount64 - _checkedAt < 60_000) return _active || _none;
                 _checkedAt = Environment.TickCount64;
                 try
                 {
                     using var search = new System.Management.ManagementObjectSearcher(@"root\SecurityCenter2", "SELECT displayName, productState FROM AntivirusProduct");
-                    _active = search.Get().Cast<System.Management.ManagementObject>().Any(p =>
-                        (p["displayName"] as string)?.Contains("Defender", StringComparison.OrdinalIgnoreCase) == true
-                        && p["productState"] is uint state && (state >> 12 & 0xF) == 1);   // 0x1000: on
+                    var on = search.Get().Cast<System.Management.ManagementObject>()
+                        .Where(p => p["productState"] is uint state && (state >> 12 & 0xF) == 1)      // 0x1000: on
+                        .Select(p => p["displayName"] as string ?? "").ToList();
+                    _active = on.Any(n => n.Contains("Defender", StringComparison.OrdinalIgnoreCase));
+                    _none = on.Count == 0;
                 }
-                catch (Exception ex) { Log.Write("Security Center", ex); _active = false; }
-                return _active;
+                catch (Exception ex) { Log.Write("Security Center", ex); _active = false; _none = false; }
+                // the shield is shown for Defender, and as a warning when nothing protects the PC
+                return _active || _none;
             }
         }
     }

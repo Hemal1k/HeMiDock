@@ -28,7 +28,7 @@ Requirements: Windows 10 2004 or newer / Windows 11, x64 or ARM64.
   notification area, status icons (network, Bluetooth, volume, battery, keyboard language, microphone / camera / location in use,
   Windows Security, updates waiting), the clock, virtual desktops, system monitor, Recycle Bin, Downloads, Show desktop.
 - **Top bar** (optional, like macOS) with the system menu, the active app and now playing.
-- **Start menu** in three looks; search of apps, Windows settings, files, calculations and conversions; quick search
+- **Start menu** in three looks; search of apps, Windows settings, files, calculations and conversions; quick controls right in the results ("volume", "wifi", "power mode", "lock"…); quick search
   (Alt + Space); the Start button menu (Win + X).
 - **Control center**: quick buttons, sound with a mixer of apps, brightness, power mode, media, Wi-Fi, Bluetooth, keep awake.
 - **Calendar** with the notifications of Windows and the events of Outlook or an internet calendar.

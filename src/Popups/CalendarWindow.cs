@@ -1,6 +1,7 @@
-﻿using System.Globalization;
+using System.Globalization;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Imaging;
@@ -41,6 +42,8 @@ sealed class CalendarWindow : PopupWindow
     UserNotificationListener _listener;
     DateTime _view;                                                   // first day of the month shown
     DateTime? _selected;
+    /// <summary>The first day shown when the wheel has moved the days by weeks (as the calendar of Windows); null = the month of <see cref="_view"/>.</summary>
+    DateTime? _top;
     Pick _pick;
     static bool _folded;                                              // the calendar folded away (until the app ends)
 
@@ -96,7 +99,7 @@ sealed class CalendarWindow : PopupWindow
         fold.Click += (_, _) => { _folded = !_folded; ApplyFold(); };
         var dateButton = new Button { Style = FlyButton, Padding = new Thickness(0), Content = _dateHeader, HorizontalAlignment = HorizontalAlignment.Left };
         ToolTipService.SetToolTip(dateButton, L.T("Back to today"));
-        dateButton.Click += (_, _) => { _view = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1); _selected = null; BuildMonth(); };
+        dateButton.Click += (_, _) => { _view = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1); _selected = null; _top = null; BuildMonth(); };
         _todayStrip = new Border { Padding = new Thickness(12, 3, 6, 3), BorderBrush = Res("DividerStrokeColorDefaultBrush"), BorderThickness = new Thickness(0, 0, 0, 1), Child = new Grid { Children = { dateButton, fold } } };
 
         // ───── the calendar ─────
@@ -136,15 +139,53 @@ sealed class CalendarWindow : PopupWindow
             Padding = new Thickness(10, 8, 10, 8), Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent),
             Child = new StackPanel { Children = { nav, new Grid { Children = { _daysView, _pickGrid } }, _eventsPanel } }
         };
-        _calendarBody.PointerWheelChanged += (_, e) => { Shift(e.GetCurrentPoint(_calendarBody).Properties.MouseWheelDelta > 0 ? -1 : 1); e.Handled = true; };
+        // the wheel: the days move by a week (as in the calendar of Windows); months and years by one step
+        _calendarBody.PointerWheelChanged += (_, e) =>
+        {
+            int step = e.GetCurrentPoint(_calendarBody).Properties.MouseWheelDelta > 0 ? -1 : 1;
+            if (_pick == Pick.Days) { _top = FirstShown.AddDays(7 * step); BuildMonth(); }
+            else Shift(step);
+            e.Handled = true;
+        };
         var calendarCard = Card(new StackPanel { Children = { _todayStrip, _calendarBody } }, new Thickness(0));
 
-        Content = new StackPanel { Width = 372, Padding = new Thickness(12), Children = { notifCard, calendarCard } };
+        _panel = new StackPanel { Width = S.CalendarWidth, Padding = new Thickness(12), Children = { notifCard, calendarCard } };
+        // edit mode: the size with the mouse by the corner away from the dock (the width; the height of the notifications)
+        _grip = new Thumb { Width = 18, Height = 18, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(5), Opacity = 0.8, Background = Res("AccentFillColorDefaultBrush") };
+        _grip.DragDelta += (_, e) =>
+        {
+            bool down = GripDown;
+            _panel.Width = Math.Clamp(_panel.Width - e.HorizontalChange, 340, 760);
+            double h = Math.Clamp(_notifCard.ActualHeight + (down ? e.VerticalChange : -e.VerticalChange), 100, 700);
+            _notifCard.MinHeight = _notifCard.Height = h;
+            _notifScroll.MaxHeight = Math.Max(60, h - 50);
+            Place();
+        };
+        _grip.DragCompleted += (_, _) => { S.CalendarWidth = _panel.Width; S.CalendarNotifHeight = _notifCard.Height; };
+        Content = new Grid { Children = { _panel, _grip } };
         _view = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
+        ApplySize();
         Fresh();
     }
 
     readonly FrameworkElement _notifCard;
+    readonly StackPanel _panel;
+    readonly Thumb _grip;
+
+    /// <summary>The dock at the top: the window grows down, the grip sits at its bottom.</summary>
+    static bool GripDown => (App.Anchor ?? App.Dock)?.AnchorFor("calendar")?.Edge == 3;
+
+    /// <summary>The size set with the mouse in edit mode; the grip only shows in edit mode.</summary>
+    void ApplySize()
+    {
+        _panel.Width = S.CalendarWidth;
+        double h = S.CalendarNotifHeight;
+        _notifCard.Height = h > 0 ? h : double.NaN;
+        _notifCard.MinHeight = h;
+        _notifScroll.MaxHeight = h > 0 ? Math.Max(60, h - 50) : 300;
+        _grip.Visibility = S.DockEditMode ? Visibility.Visible : Visibility.Collapsed;
+        _grip.VerticalAlignment = GripDown ? VerticalAlignment.Bottom : VerticalAlignment.Top;
+    }
 
     /// <summary>
     /// While it is open, removing notifications does not make the window smaller: changing the size of a window of WinUI
@@ -159,9 +200,10 @@ sealed class CalendarWindow : PopupWindow
 
     protected override void Reopen()
     {
-        _notifCard.MinHeight = 0;
+        ApplySize();
         _view = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
         _selected = null;
+        _top = null;
         _events = null;                                                // appointments may have changed meanwhile
         Fresh();
     }
@@ -205,6 +247,9 @@ sealed class CalendarWindow : PopupWindow
     /// <summary>First day of the week: from the settings or the region of Windows.</summary>
     static int FirstDay => S.CalendarFirstDay switch { 1 => 1, 2 => 0, _ => (int)CultureInfo.CurrentCulture.DateTimeFormat.FirstDayOfWeek };
 
+    /// <summary>The first day of the six weeks shown: moved by the wheel, else the week of the 1st of the month.</summary>
+    DateTime FirstShown => _top ?? _view.AddDays(-(((int)_view.DayOfWeek - FirstDay + 7) % 7));
+
     void BuildMonth()
     {
         var c = CultureInfo.CurrentCulture;
@@ -217,10 +262,21 @@ sealed class CalendarWindow : PopupWindow
         _yearText.Text = _view.Year.ToString();
         _yearPart.Visibility = Visibility.Visible;
 
-        int offset = ((int)_view.DayOfWeek - FirstDay + 7) % 7;
-        var start = _view.AddDays(-offset);
+        // moved by the wheel: the month that fills the most of the view is the one shown and named
+        if (_top is DateTime top) _view = new DateTime(top.AddDays(17).Year, top.AddDays(17).Month, 1);
+        _monthText.Text = c.DateTimeFormat.GetMonthName(_view.Month);
+        _yearText.Text = _view.Year.ToString();
+        var start = FirstShown;
         bool weeks = S.CalendarWeekNumbers;
         _dayGrid.Children.Clear();
+        // the week of the chosen day slightly highlighted, the whole row
+        if ((_selected ?? DateTime.Today) is var sel && sel.Date >= start && sel.Date < start.AddDays(42))
+        {
+            var band = new Border { Background = Res("SubtleFillColorSecondaryBrush"), CornerRadius = new CornerRadius(8), Margin = new Thickness(0, 2, 0, 2), IsHitTestVisible = false };
+            Grid.SetRow(band, (int)(sel.Date - start).TotalDays / 7);
+            Grid.SetColumnSpan(band, weeks ? 8 : 7);
+            _dayGrid.Children.Add(band);
+        }
         for (int i = 0; i < 42; i++)
         {
             int row = i / 7, col = i % 7 + (weeks ? 1 : 0);
@@ -244,20 +300,21 @@ sealed class CalendarWindow : PopupWindow
         Brush text = today ? Res("TextOnAccentFillColorPrimaryBrush") : Res(inMonth ? "TextFillColorPrimaryBrush" : "TextFillColorTertiaryBrush");
         var circle = new Button
         {
-            Style = FlyButton, Width = 30, Height = 30, Padding = new Thickness(0), CornerRadius = new CornerRadius(6),
+            Style = FlyButton, Width = 36, Height = 36, Padding = new Thickness(0), CornerRadius = new CornerRadius(7),
             Background = today ? Res("AccentFillColorDefaultBrush") : new SolidColorBrush(Microsoft.UI.Colors.Transparent),
             BorderBrush = selected && !today ? Res("TextFillColorSecondaryBrush") : new SolidColorBrush(Microsoft.UI.Colors.Transparent),
             BorderThickness = new Thickness(1.5), HorizontalAlignment = HorizontalAlignment.Center,
-            Content = new TextBlock { Text = d.Day.ToString(), Foreground = text, FontSize = 12.5, FontWeight = today ? Microsoft.UI.Text.FontWeights.SemiBold : Microsoft.UI.Text.FontWeights.Normal }
+            Content = new TextBlock { Text = d.Day.ToString(), Foreground = text, FontSize = 14, FontWeight = today ? Microsoft.UI.Text.FontWeights.SemiBold : Microsoft.UI.Text.FontWeights.Normal }
         };
         if (today) circle.Resources["ButtonBackgroundPointerOver"] = Res("AccentFillColorSecondaryBrush");
         circle.Click += (_, _) =>
         {
             _selected = d;
-            if (d.Month != _view.Month) _view = new DateTime(d.Year, d.Month, 1);
+            // a day of another month: that month – unless the wheel has moved the days (they stay where they are)
+            if (_top == null && d.Month != _view.Month) _view = new DateTime(d.Year, d.Month, 1);
             BuildMonth();
         };
-        var cell = new Grid { Height = 33, Children = { circle } };
+        var cell = new Grid { Height = 40, Children = { circle } };
         // a dot under the number: the day has appointments
         if (EventsOn && _events != null && _events.Any(e => OnDay(e, d.Date)))
             cell.Children.Add(new Ellipse
@@ -275,7 +332,7 @@ sealed class CalendarWindow : PopupWindow
         {
             case Pick.Months: _view = _view.AddYears(step); BuildMonths(); break;
             case Pick.Years: _view = _view.AddYears(12 * step); BuildYears(); break;
-            default: _view = _view.AddMonths(step); BuildMonth(); break;
+            default: _view = _view.AddMonths(step); _top = null; BuildMonth(); break;
         }
     }
 

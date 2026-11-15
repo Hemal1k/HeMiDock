@@ -1,4 +1,4 @@
-﻿using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
@@ -717,6 +717,7 @@ sealed class StartWindow : PopupWindow
     /// <summary>A row of a list: icon (or symbol), name and a second line; a folder has its chevron.</summary>
     FrameworkElement Row(StartEntry e, double indent = 0, bool pinned = false)
     {
+        if (e.Kind == EntryKind.Control) return QuickControlView.Build(e, () => Launch(e));
         double size = _layout == 1 ? Math.Round(S.StartIconSize * 0.78) : 24;
         FrameworkElement icon = e.IconKey != null || e.OwnIcon != null ? IconOf(e, size) : new FontIcon { Glyph = e.Glyph ?? "", FontSize = 18, Width = size };
         var texts = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
@@ -919,6 +920,14 @@ sealed class StartWindow : PopupWindow
 
     void Launch(StartEntry e, bool admin = false)
     {
+        // a system control: a switch or a choice stays in the window, an action closes it and runs
+        if (e.Kind == EntryKind.Control)
+        {
+            if (!QuickControlView.Activate(e)) return;
+            CloseNow();
+            try { e.Control.Run?.Invoke(); } catch (Exception ex) { Log.Write("Quick control " + e.Key, ex); }
+            return;
+        }
         if (e.Kind == EntryKind.AppFolder) { OpenFolder(e); return; }   // a folder opens inside Start
         CloseNow();
         try { e.Run(admin); }

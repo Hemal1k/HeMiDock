@@ -1,4 +1,4 @@
-﻿using System.ComponentModel;
+using System.ComponentModel;
 using System.Data.OleDb;
 using System.Globalization;
 using System.Text;
@@ -6,7 +6,7 @@ using System.Text.RegularExpressions;
 
 namespace HeMiDock;
 
-enum EntryKind { App, Setting, Tool, File, Folder, Recent, Calc, Open, AppFolder, DockSetting }
+enum EntryKind { App, Setting, Tool, File, Folder, Recent, Calc, Open, AppFolder, DockSetting, Control }
 
 /// <summary>Entry in the Start menu: app, setting, tool, file, calculator result…</summary>
 /// <summary>How often apps were opened from Start and the search (only on this PC) – the search puts them higher.</summary>
@@ -138,7 +138,7 @@ static class SearchEngine
     static readonly Dictionary<string, string> NormCache = new();
 
     /// <summary>Lower case without diacritics – "cafe" finds "Café".</summary>
-    static string Norm(string s)
+    internal static string Norm(string s)
     {
         if (string.IsNullOrEmpty(s)) return "";
         if (NormCache.TryGetValue(s, out var c)) return c;
@@ -203,6 +203,8 @@ static class SearchEngine
         if (path != null && (Directory.Exists(path) || File.Exists(path)))
             res.Add(new StartEntry { Kind = EntryKind.Open, Name = L.T("Open {0}", path), Subtitle = Directory.Exists(path) ? L.T("Folder") : L.T("File"), Key = path, IconKey = path, IconIsFile = true, Group = L.T("Open") });
 
+        // the system controls first: "volume", "wifi", "lock" … (see QuickControls)
+        res.AddRange(QuickControls.Find(qN));
         if (TryCalc(t, out string calc))
             res.Add(new StartEntry { Kind = EntryKind.Calc, Name = calc, Subtitle = $"{t} = {calc}  ·  {L.T("Enter copies the result")}", Glyph = "\uE8EF", Group = L.T("Calculator") });
         else if (s.SearchConversions && Converter.TryConvert(t, out string converted, out string number, out string expression))

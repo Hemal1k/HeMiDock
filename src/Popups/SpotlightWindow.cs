@@ -1,4 +1,4 @@
-﻿using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
@@ -107,6 +107,7 @@ sealed class SpotlightWindow : PopupWindow
 
     FrameworkElement Row(StartEntry e)
     {
+        if (e.Kind == EntryKind.Control) return QuickControlView.Build(e, () => Run(e));
         FrameworkElement icon;
         if (e.IconKey != null)
         {
@@ -150,6 +151,13 @@ sealed class SpotlightWindow : PopupWindow
 
     void Run(StartEntry e)
     {
+        if (e.Kind == EntryKind.Control)
+        {
+            if (!QuickControlView.Activate(e)) return;
+            CloseNow();
+            try { e.Control.Run?.Invoke(); } catch (Exception ex) { Log.Write("Quick control " + e.Key, ex); }
+            return;
+        }
         CloseNow();
         e.Run(false);
     }

@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Net.Http;
 using System.Runtime.InteropServices;
 using System.Text.Json;
@@ -225,6 +225,14 @@ static class ClipboardHistory
     }
 
     public static IEnumerable<string> Find(Func<string, bool> matches) => Items.Where(matches).Take(5);
+
+    /// <summary>The history here and the one of Windows (Win+V) emptied, and the clipboard itself.</summary>
+    public static void ClearAll()
+    {
+        Items.Clear();
+        try { Windows.ApplicationModel.DataTransfer.Clipboard.ClearHistory(); Windows.ApplicationModel.DataTransfer.Clipboard.Clear(); }
+        catch (Exception ex) { Log.Write("Clipboard clear", ex); }
+    }
 }
 
 /// <summary>How Windows uses the monitors now: the same choices as the page Monitors of the control center.</summary>
