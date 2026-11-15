@@ -33,7 +33,7 @@ static class Updater
         Http.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
     }
 
-    /// <summary>The version of this dock (1.5.0 of "Beta 1.5.0").</summary>
+    /// <summary>The version of this dock (1.5.0).</summary>
     public static Version Current
     {
         get

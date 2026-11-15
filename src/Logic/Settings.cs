@@ -22,13 +22,13 @@ static class AppInfo
     // HeMiDock.exe, where the version is set (this library has none of its own)
     static readonly System.Reflection.Assembly App = System.Reflection.Assembly.GetEntryAssembly() ?? typeof(AppInfo).Assembly;
 
-    /// <summary>"Beta 1.0.0" (the version in HeMiDock.csproj).</summary>
+    /// <summary>"1.0.0" (the version in HeMiDock.csproj).</summary>
     public static string Version
     {
         get
         {
             var v = App.GetName().Version;
-            return v == null ? "–" : $"Beta {v.Major}.{v.Minor}.{Math.Max(0, v.Build)}";
+            return v == null ? "–" : $"{v.Major}.{v.Minor}.{Math.Max(0, v.Build)}";
         }
     }
 

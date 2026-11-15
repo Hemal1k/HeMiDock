@@ -20,7 +20,7 @@
 AppId=HeMiDock
 AppName=HeMiDock
 AppVersion={#AppVersion}
-AppVerName=HeMiDock Beta {#AppVersion}
+AppVerName=HeMiDock {#AppVersion}
 AppPublisher=Richard Hemala
 AppPublisherURL=https://github.com/Hemal1k/HeMiDock
 AppSupportURL=https://github.com/Hemal1k/HeMiDock/issues
