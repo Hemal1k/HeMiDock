@@ -35,13 +35,24 @@ static class QuickControlView
             case ControlType.Slider:
             {
                 var value = new TextBlock { Width = 32, TextAlignment = TextAlignment.Right, VerticalAlignment = VerticalAlignment.Center, Foreground = Res("TextFillColorSecondaryBrush") };
-                var slider = new Slider { Width = 200, Minimum = 0, Maximum = 100, StepFrequency = 1, IsEnabled = false, VerticalAlignment = VerticalAlignment.Center };
+                // the slider takes what the name leaves (a narrow Start cut the name to "Vol…")
+                var slider = new Slider { Minimum = 0, Maximum = 100, StepFrequency = 1, IsEnabled = false, VerticalAlignment = VerticalAlignment.Center };
                 slider.ValueChanged += (_, a) =>
                 {
                     value.Text = ((int)Math.Round(a.NewValue)).ToString();
                     if (!loading) _ = c.Set(a.NewValue);
                 };
-                right = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Children = { slider, value } };
+                var pair = new Grid { ColumnSpacing = 8 };
+                pair.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });                                 // empty: pushes it right
+                pair.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(100, GridUnitType.Star), MinWidth = 80, MaxWidth = 220 });
+                pair.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                Grid.SetColumn(slider, 1);
+                pair.Children.Add(slider);
+                Grid.SetColumn(value, 2);
+                pair.Children.Add(value);
+                right = pair;
+                grid.ColumnDefinitions[1].Width = GridLength.Auto;             // the name whole, the slider in the rest
+                grid.ColumnDefinitions[2].Width = new GridLength(1, GridUnitType.Star);
                 c.Widget = slider;
                 break;
             }
