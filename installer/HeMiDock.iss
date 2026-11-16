@@ -155,11 +155,24 @@ begin
   end;
 end;
 
+{ .NET goes into Program Files and needs administrator rights: asked for (UAC) only when Setup does not have them }
 function RunElevated(const FileName, Params: String): Boolean;
 var
   Code: Integer;
 begin
-  Result := ShellExec('runas', FileName, Params, '', SW_SHOW, ewWaitUntilTerminated, Code) and ((Code = 0) or (Code = 3010));
+  if IsAdmin then
+    Result := Exec(FileName, Params, '', SW_HIDE, ewWaitUntilTerminated, Code) and ((Code = 0) or (Code = 3010))
+  else
+    Result := ShellExec('runas', FileName, Params, '', SW_SHOW, ewWaitUntilTerminated, Code) and ((Code = 0) or (Code = 3010));
+end;
+
+{ the Windows App Runtime needs no administrator rights: without them it is installed for this user only (no UAC prompt –
+  a quiet install, e.g. through winget, has nobody to answer one) }
+function RunPlain(const FileName, Params: String): Boolean;
+var
+  Code: Integer;
+begin
+  Result := Exec(FileName, Params, '', SW_HIDE, ewWaitUntilTerminated, Code) and ((Code = 0) or (Code = 3010));
 end;
 
 procedure OpenLink(Sender: TObject);
@@ -271,7 +284,7 @@ begin
     if NeedRuntime then
     begin
       DownloadPage.SetText(FmtMessage(CustomMessage('Prereq'), ['Windows App Runtime 2.6']), '');
-      if not RunElevated(ExpandConstant('{tmp}\windowsappruntimeinstall.exe'), '--quiet') or not HasAppRuntime then
+      if not RunPlain(ExpandConstant('{tmp}\windowsappruntimeinstall.exe'), '--quiet') or not HasAppRuntime then
       begin
         SuppressibleMsgBox(FmtMessage(CustomMessage('PrereqFailed'), ['Windows App Runtime 2.6 (' + Arch + ')', 'https://learn.microsoft.com/windows/apps/windows-app-sdk/downloads']), mbError, MB_OK, IDOK);
         Result := False;
