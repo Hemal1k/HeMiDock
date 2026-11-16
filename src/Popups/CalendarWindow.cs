@@ -150,18 +150,46 @@ sealed class CalendarWindow : PopupWindow
         var calendarCard = Card(new StackPanel { Children = { _todayStrip, _calendarBody } }, new Thickness(0));
 
         _panel = new StackPanel { Width = S.CalendarWidth, Padding = new Thickness(12), Children = { notifCard, calendarCard } };
-        // edit mode: the size with the mouse by the corner away from the dock (the width; the height of the notifications)
-        _grip = new Thumb { Width = 18, Height = 18, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(5), Opacity = 0.8, Background = Res("AccentFillColorDefaultBrush") };
-        _grip.DragDelta += (_, e) =>
+        // edit mode: the size with the mouse by the corner away from the dock (the width; the height of the notifications).
+        // The grip moves with the window while it is dragged, so the change is taken from the mouse on the screen since the
+        // start (the change the Thumb reports is relative to itself and made the window jump); the window is placed again by
+        // ContentSizeChanged once the new size is laid out (placing it here too used the old size and made it flicker).
+        var thumb = _gripThumb = new Thumb { Opacity = 0, Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent) };                       // invisible but takes the mouse; the look is the lines below
+        _gripLines = new Microsoft.UI.Xaml.Shapes.Path
         {
-            bool down = GripDown;
-            _panel.Width = Math.Clamp(_panel.Width - e.HorizontalChange, 340, 760);
-            double h = Math.Clamp(_notifCard.ActualHeight + (down ? e.VerticalChange : -e.VerticalChange), MinNotifHeight(), 700);
+            Data = (Microsoft.UI.Xaml.Media.Geometry)Microsoft.UI.Xaml.Markup.XamlBindingHelper.ConvertValue(typeof(Microsoft.UI.Xaml.Media.Geometry), "M 2,9 L 9,2 M 2,15 L 15,2"),
+            Stroke = Res("TextFillColorSecondaryBrush"), StrokeThickness = 1.4, StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round,
+            Width = 17, Height = 17, RenderTransformOrigin = new Windows.Foundation.Point(0.5, 0.5)
+        };
+        _grip = new Grid
+        {
+            Width = 22, Height = 22, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(3),
+            Children = { _gripLines, thumb }
+        };
+        double startW = 0, startH = 0, widthFactor = 1;
+        Native.POINT start = default;
+        thumb.DragStarted += (_, _) =>
+        {
+            Native.GetCursorPos(out start);
+            startW = _panel.Width;
+            startH = _notifCard.ActualHeight;
+            // in the middle of its button both sides move with the width (the left edge by half of it); kept at the edge of
+            // the monitor only the left one does
+            var area = (App.Anchor ?? App.Dock)?.Monitor.Work;
+            widthFactor = area is { } a && Native.GetWindowRect(Hwnd, out var r) && r.Right >= a.Right - (int)Math.Round(12 * Scale) ? 1 : 2;
+        };
+        thumb.DragDelta += (_, _) =>
+        {
+            if (!Native.GetCursorPos(out var now)) return;
+            double s = Scale, dx = (now.X - start.X) / s, dy = (now.Y - start.Y) / s;
+            double w = Math.Round(Math.Clamp(startW - dx * widthFactor, 340, 760));
+            double h = Math.Round(Math.Clamp(startH + (GripDown ? dy : -dy), MinNotifHeight(), 700));
+            if (w == _panel.Width && h == _notifCard.Height) return;
+            _panel.Width = w;
             _notifCard.MinHeight = _notifCard.Height = h;
             _notifScroll.MaxHeight = Math.Max(60, h - 50);
-            Place();
         };
-        _grip.DragCompleted += (_, _) => { S.CalendarWidth = _panel.Width; S.CalendarNotifHeight = _notifCard.Height; };
+        thumb.DragCompleted += (_, _) => { S.CalendarWidth = _panel.Width; S.CalendarNotifHeight = _notifCard.Height; };
         Content = new Grid { Children = { _panel, _grip } };
         _view = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
         ApplySize();
@@ -170,7 +198,9 @@ sealed class CalendarWindow : PopupWindow
 
     readonly FrameworkElement _notifCard;
     readonly StackPanel _panel;
-    readonly Thumb _grip;
+    readonly Grid _grip;
+    readonly Microsoft.UI.Xaml.Shapes.Path _gripLines;
+    readonly Thumb _gripThumb;
 
     /// <summary>The dock at the top: the window grows down, the grip sits at its bottom.</summary>
     static bool GripDown => (App.Anchor ?? App.Dock)?.AnchorFor("calendar")?.Edge == 3;
@@ -199,6 +229,9 @@ sealed class CalendarWindow : PopupWindow
         _notifScroll.MaxHeight = h > 0 ? Math.Max(60, h - 50) : 300;
         _grip.Visibility = S.DockEditMode ? Visibility.Visible : Visibility.Collapsed;
         _grip.VerticalAlignment = GripDown ? VerticalAlignment.Bottom : VerticalAlignment.Top;
+        // the lines lie in the corner: top left (the dock at the bottom) or, turned over, bottom left
+        _gripLines.RenderTransform = new ScaleTransform { ScaleX = 1, ScaleY = GripDown ? -1 : 1 };
+        ProtectedCursorHost.Set(_gripThumb, GripDown ? Microsoft.UI.Input.InputSystemCursorShape.SizeNortheastSouthwest : Microsoft.UI.Input.InputSystemCursorShape.SizeNorthwestSoutheast);
     }
 
     /// <summary>
