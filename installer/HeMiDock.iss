@@ -25,7 +25,8 @@ AppPublisher=Richard Hemala
 AppPublisherURL=https://github.com/Hemal1k/HeMiDock
 AppSupportURL=https://github.com/Hemal1k/HeMiDock/issues
 AppUpdatesURL=https://github.com/Hemal1k/HeMiDock/releases
-DefaultDirName={autopf}\HeMiDock
+DefaultDirName={autopf}\HeMi\HeMiDock
+UsePreviousAppDir=no
 DisableDirPage=yes
 DisableProgramGroupPage=yes
 DefaultGroupName=HeMiDock
@@ -79,6 +80,8 @@ Name: "{autoprograms}\HeMiDock"; Filename: "{app}\HeMiDock.exe"
 Name: "{autodesktop}\HeMiDock"; Filename: "{app}\HeMiDock.exe"; Tasks: desktopicon
 
 [Run]
+; the File Explorer items and the start with Windows point to this installation (also after a move from the old folder)
+Filename: "{app}\HeMiDock.exe"; Parameters: "--repair"; Flags: runasoriginaluser waituntilterminated runhidden
 ; after an interactive installation: offered; after an update (quiet): the dock starts again by itself
 ; (as the user who started the installer – never as administrator after an installation for all users)
 Filename: "{app}\HeMiDock.exe"; Description: "{cm:LaunchAfter}"; Flags: nowait postinstall skipifsilent runasoriginaluser
@@ -101,6 +104,49 @@ Root: HKCU; Subkey: "Software\Classes\Applications\HeMiDock.exe"; Flags: uninsde
 Root: HKCU; Subkey: "Software\HeMi"; Flags: uninsdeletekeyifempty dontcreatekey
 
 [Code]
+// Since 2026-11 the HeMi apps go into one folder HeMi, as their settings do (%AppData%\HeMi\<app>): {autopf}\HeMi\HeMiDock.
+// An installation in the old folder {autopf}\HeMiDock moves: the app running from there ends, the new version goes into the
+// new folder ("--repair" points the File Explorer items and the start with Windows to it) and the old folder is deleted.
+var
+  OldFolder: String;
+
+function FindOldFolder: String;
+begin
+  if RegQueryStringValue(HKA, 'Software\Microsoft\Windows\CurrentVersion\Uninstall\HeMiDock_is1', 'InstallLocation', Result) then
+  begin
+    Result := RemoveBackslashUnlessRoot(Result);
+    if (CompareText(Result, ExpandConstant('{app}')) = 0) or (CompareText(ExtractFileName(Result), 'HeMiDock') <> 0)
+      or not FileExists(Result + '\HeMiDock.exe') then
+      Result := '';
+  end
+  else
+    Result := '';
+end;
+
+procedure StopOld;
+var
+  Code: Integer;
+begin
+  OldFolder := FindOldFolder;
+  if OldFolder = '' then Exit;
+  // the dock gives the taskbar of Windows back first
+  Exec(OldFolder + '\HeMiDock.exe', '--exit', '', SW_HIDE, ewWaitUntilTerminated, Code);
+  Sleep(1500);
+  Exec(ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'),
+    '-NoProfile -NonInteractive -Command "Get-Process | Where-Object { $_.Path -like ''' + OldFolder + '\*'' } | Stop-Process -Force"',
+    '', SW_HIDE, ewWaitUntilTerminated, Code);
+end;
+
+procedure DeleteOld;
+begin
+  if OldFolder <> '' then DelTree(OldFolder, True, True, True);
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+begin
+  if CurStep = ssPostInstall then DeleteOld;
+end;
+
 const
   DotNetLicense = 'https://aka.ms/dotnet-license';
   AppRuntimeLicense = 'https://www.nuget.org/packages/Microsoft.WindowsAppSDK.Runtime/2.6.5/License';
@@ -161,6 +207,7 @@ var
   Code: Integer;
 begin
   Result := '';
+  StopOld;
   if FileExists(ExpandConstant('{app}\HeMiDock.exe')) then
   begin
     Exec(ExpandConstant('{app}\HeMiDock.exe'), '--exit', '', SW_HIDE, ewWaitUntilTerminated, Code);

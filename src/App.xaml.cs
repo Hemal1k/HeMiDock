@@ -46,6 +46,20 @@ public partial class App : Application
         // HeMiDock.exe --exit ends the running one properly (the taskbar of Windows and the tray icons come back)
         // --uninstall (the uninstaller): the dock ends, and what it put into Windows goes – the start at sign-in (task and Run
         // value) and "Pin to Start" of Explorer; the settings in %AppData% stay
+        // --repair (the installer, after an installation or a move to another folder): the start at sign-in and "Pin to
+        // Start" of Explorer point to this HeMiDock.exe
+        if (Environment.GetCommandLineArgs().Contains("--repair"))
+        {
+            try
+            {
+                L.Apply(DockSettings.Current.Language);
+                if (Autostart.IsOn) Autostart.IsOn = true;
+                ExplorerVerb.Apply(DockSettings.Current.ReplaceStartMenu);
+            }
+            catch (Exception ex) { Log.Write("Repair", ex); }
+            Exit();
+            return;
+        }
         bool uninstall = Environment.GetCommandLineArgs().Contains("--uninstall");
         if (uninstall || Environment.GetCommandLineArgs().Contains("--exit"))
         {
