@@ -25,6 +25,7 @@ sealed partial class DockWindow
     {
         if (_closed) return;
         if (_menusOpen > 0) { _placeLater = true; return; }          // moving the window would close the open menu
+        using var timed = Diag.Time("Dock placed", 30);
         _mon = Monitors.All().FirstOrDefault(m => m.Device == _mon.Device) ?? Monitors.Primary();
         Row.Measure(new Windows.Foundation.Size(double.PositiveInfinity, double.PositiveInfinity));
         RowRight.Measure(new Windows.Foundation.Size(double.PositiveInfinity, double.PositiveInfinity));

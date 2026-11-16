@@ -1965,10 +1965,18 @@ namespace ManagedShell.WindowsTray
 
             ShellLogger.Debug("TrayService: Raising Shell_TrayWnd");
             MakeTrayTopmost();
-            // HeMiDock: another tray came over ours – Explorer started after the dock (the dock starts at sign-in by a task,
-            // before Explorer): the apps that added their icons to its tray meanwhile add them to ours again
-            SendTaskbarCreated();
+            // HeMiDock: another tray came over ours. Only a new one is Explorer started after the dock (the dock starts at
+            // sign-in by a task, before Explorer): the apps that added their icons to its tray meanwhile add them to ours
+            // again. The tray of the same Explorer only came forward (after every full-screen window, also the overlay of
+            // the Snipping Tool) – telling all apps to add their icons again then slowed the whole PC down.
+            if (taskbarHwnd != _lastForeignTray)
+            {
+                _lastForeignTray = taskbarHwnd;
+                SendTaskbarCreated();
+            }
         }
+
+        private IntPtr _lastForeignTray;
 
         private void SetWindowsTrayBottommost()
         {

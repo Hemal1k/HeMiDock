@@ -36,7 +36,8 @@ public partial class App : Application
             else if (theme == 2) RequestedTheme = ApplicationTheme.Dark;
         }
         catch (Exception ex) { Log.Write("App theme", ex); }
-        UnhandledException += (_, e) => { Log.Note("Unhandled", e.Exception?.ToString()); e.Handled = true; };
+        // only in debug mode (without it the app writes no logs): the error, and the events before it into crash-context.txt
+        UnhandledException += (_, e) => { Log.Write("Unhandled", e.Exception); Diag.Crash(e.Exception); e.Handled = true; };
         AppDomain.CurrentDomain.ProcessExit += (_, _) => Cleanup();
     }
 

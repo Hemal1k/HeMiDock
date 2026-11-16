@@ -8,6 +8,17 @@
                 <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
             </ResourceDictionary.MergedDictionaries>
 
+            <!-- light mode: the highlight under the mouse was almost white on the white pop-ups – a light grey that is seen
+                 (the buttons, the rows of Start and the control center, the icons of the dock) -->
+            <ResourceDictionary.ThemeDictionaries>
+                <ResourceDictionary x:Key="Light">
+                    <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="#14000000" />
+                    <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="#0C000000" />
+                    <SolidColorBrush x:Key="SubtleFillColorSecondaryBrush" Color="#14000000" />
+                    <SolidColorBrush x:Key="SubtleFillColorTertiaryBrush" Color="#0C000000" />
+                </ResourceDictionary>
+            </ResourceDictionary.ThemeDictionaries>
+
             <!-- an icon of the dock: no frame, a light background under the mouse -->
             <Style x:Key="DockButton" TargetType="Button" BasedOn="{StaticResource DefaultButtonStyle}">
                 <Setter Property="Background" Value="Transparent" />

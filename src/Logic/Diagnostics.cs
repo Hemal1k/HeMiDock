@@ -53,29 +53,199 @@ static class Diag
         if (on)
         {
             Write("Debug", "debug mode on");
+            StartWatching();                                              // the freeze watch and the events of Windows (they write only in debug mode)
             // once the app has started (docks, tray icons) – a moment later
             Task.Delay(3000).ContinueWith(_ => Write("System", "\n" + SystemInfo()));
-            _beat ??= new Timer(_ => Write("Heartbeat", Resources()));
+            _beat ??= new Timer(_ => Write("Heartbeat", Resources() + $", CPU of the dock {DockCpu():0.0} %, of the PC {SystemCpu():0} %"));
             _beat.Change(TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(5));
         }
         else _beat?.Change(Timeout.Infinite, Timeout.Infinite);
     }
 
-    /// <summary>One line into debug-log.txt (only in debug mode). The file is started again above 4 MB, the previous one kept as .old.</summary>
+    // ───────────────────────── events ─────────────────────────
+    // Only in debug mode (without it the app records nothing at all): every event goes into debug-log.txt and into a memory of
+    // the last ones (a crash and the diagnostic data have what happened right before). The same line
+    // again and again is written once with how many times it came; many lines of one kind in a second are marked as a storm
+    // (the AppBar messages that made the whole PC stutter were 40 in 0.3 s – easy to miss among the other lines).
+
+    const int RingSize = 3000;
+    static readonly string[] Ring = new string[RingSize];
+    static int _ringNext, _ringCount;
+    static string _lastKey;
+    static int _repeats;
+    static DateTime _lastAt, _repeatFrom;
+    static readonly Dictionary<string, (DateTime From, int Count, bool Told)> Rates = new();
+    const int StormCount = 20;
+
+    /// <summary>One event: into the memory of the last ones, and in debug mode into debug-log.txt (started again above 4 MB).</summary>
     public static void Write(string where, string message)
     {
-        if (!On) return;
+        if (!On) return;                                                  // with debug mode off nothing at all, not even in memory
         try
         {
+            var now = DateTime.Now;
             lock (Gate)
             {
-                Directory.CreateDirectory(AppPaths.Logs);
-                var file = new FileInfo(LogFile);
-                if (file.Exists && file.Length > 4 * 1024 * 1024) File.Move(LogFile, Path.Combine(AppPaths.Logs, "debug-log.old.txt"), true);
-                File.AppendAllText(LogFile, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} [{Environment.CurrentManagedThreadId}] [{where}] {message}\n");
+                string key = where + "|" + message;
+                if (key == _lastKey && (now - _lastAt).TotalSeconds < 2)
+                {
+                    if (_repeats++ == 0) _repeatFrom = _lastAt;
+                    _lastAt = now;
+                    Storm(where, message, now);
+                    return;
+                }
+                FlushRepeats();
+                _lastKey = key;
+                _lastAt = now;
+                Store($"{now:yyyy-MM-dd HH:mm:ss.fff} [{Environment.CurrentManagedThreadId}] [{where}] {message}");
+                Storm(where, message, now);
             }
         }
         catch { }
+    }
+
+    /// <summary>"↑ the same ×N" after a line that came again and again.</summary>
+    static void FlushRepeats()
+    {
+        if (_repeats == 0) return;
+        Store($"{_lastAt:yyyy-MM-dd HH:mm:ss.fff}   ↑ the same ×{_repeats} more in {(_lastAt - _repeatFrom).TotalMilliseconds:0} ms");
+        _repeats = 0;
+    }
+
+    /// <summary>Many events of one kind (numbers left out: window handles, percentages) within a second: one warning line.</summary>
+    static void Storm(string where, string message, DateTime now)
+    {
+        var kind = new StringBuilder(where).Append('|');
+        foreach (char c in message.Length > 80 ? message[..80] : message) kind.Append(char.IsDigit(c) ? '#' : c);
+        string k = kind.ToString();
+        if (!Rates.TryGetValue(k, out var r) || (now - r.From).TotalSeconds > 1) r = (now, 0, false);
+        r.Count++;
+        if (r.Count >= StormCount && !r.Told)
+        {
+            r.Told = true;
+            Store($"{now:yyyy-MM-dd HH:mm:ss.fff} [{Environment.CurrentManagedThreadId}] [STORM] {r.Count}× \"{where}: {message}\" within {(now - r.From).TotalMilliseconds:0} ms");
+        }
+        Rates[k] = r;
+        if (Rates.Count > 400) foreach (var old in Rates.Where(p => (now - p.Value.From).TotalSeconds > 5).Select(p => p.Key).ToList()) Rates.Remove(old);
+    }
+
+    /// <summary>A finished line: into the memory, in debug mode into the file.</summary>
+    static void Store(string line)
+    {
+        Ring[_ringNext] = line;
+        _ringNext = (_ringNext + 1) % RingSize;
+        if (_ringCount < RingSize) _ringCount++;
+        if (!On) return;
+        Directory.CreateDirectory(AppPaths.Logs);
+        var file = new FileInfo(LogFile);
+        if (file.Exists && file.Length > 4 * 1024 * 1024) File.Move(LogFile, Path.Combine(AppPaths.Logs, "debug-log.old.txt"), true);
+        File.AppendAllText(LogFile, line + "\n");
+    }
+
+    /// <summary>The last events (oldest first) – for a crash, a freeze and the diagnostic data.</summary>
+    public static string Recent(int count = RingSize)
+    {
+        lock (Gate)
+        {
+            FlushRepeats();
+            int n = Math.Min(count, _ringCount);
+            var s = new StringBuilder();
+            for (int i = n; i > 0; i--) s.AppendLine(Ring[((_ringNext - i) % RingSize + RingSize) % RingSize]);
+            return s.ToString();
+        }
+    }
+
+    /// <summary>An unhandled error: it and the events before it into Logs\crash-context.txt (also with debug mode off).</summary>
+    public static void Crash(Exception ex)
+    {
+        try
+        {
+            Directory.CreateDirectory(AppPaths.Logs);
+            File.WriteAllText(Path.Combine(AppPaths.Logs, "crash-context.txt"), $"{DateTime.Now:yyyy-MM-dd HH:mm:ss}  {ex}\n\nThe events before it:\n{Recent(400)}");
+        }
+        catch { }
+    }
+
+    /// <summary>
+    /// Measures a piece of work: <c>using (Diag.Time("Dock placed")) { … }</c> – a line only when it took longer than
+    /// <paramref name="limitMs"/> (a slow dock or pop-up shows in the log with what was slow).
+    /// </summary>
+    public static Timed Time(string what, int limitMs = 50) => new(what, limitMs);
+
+    public readonly struct Timed : IDisposable
+    {
+        readonly string _what;
+        readonly int _limit;
+        readonly long _start;
+        public Timed(string what, int limit) { _what = what; _limit = limit; _start = Stopwatch.GetTimestamp(); }
+        public void Dispose()
+        {
+            double ms = Stopwatch.GetElapsedTime(_start).TotalMilliseconds;
+            if (ms > _limit) Write("Slow", $"{_what} took {ms:0} ms");
+        }
+    }
+
+    // ───────────────────────── freezes and the system ─────────────────────────
+
+    static Thread _watch;
+
+    /// <summary>
+    /// Once: a thread that asks the thread of the interface every half second whether it answers – a freeze (the dock, Start or
+    /// the control center not reacting) is written with how long it lasted. And the events of Windows that often come before
+    /// problems: sleep and wake, lock and unlock, monitors and display settings, the theme.
+    /// </summary>
+    static void StartWatching()
+    {
+        if (_watch != null || Ui.Context == null) return;
+        _watch = new Thread(WatchUi) { IsBackground = true, Name = "HeMiDock freeze watch", Priority = ThreadPriority.AboveNormal };
+        _watch.Start();
+        try
+        {
+            SystemEvents.PowerModeChanged += (_, e) => Write("System", "power: " + e.Mode);
+            SystemEvents.SessionSwitch += (_, e) => Write("System", "session: " + e.Reason);
+            SystemEvents.DisplaySettingsChanged += (_, _) => Write("System", "display settings changed: " +
+                string.Join(", ", Monitors.All().Select(m => $"{m.Device} {m.Bounds.Right - m.Bounds.Left}×{m.Bounds.Bottom - m.Bounds.Top} work {m.Work.Left},{m.Work.Top}–{m.Work.Right},{m.Work.Bottom}")));
+            SystemEvents.UserPreferenceChanged += (_, e) => Write("System", "user preference changed: " + e.Category);
+            SystemEvents.TimeChanged += (_, _) => Write("System", "time changed");
+        }
+        catch (Exception ex) { Write("Debug", "system events: " + ex.Message); }
+    }
+
+    static void WatchUi()
+    {
+        using var answered = new ManualResetEventSlim();
+        while (true)
+        {
+            Thread.Sleep(500);
+            if (!On) continue;                                            // debug mode off: nothing is watched
+            answered.Reset();
+            long start = Stopwatch.GetTimestamp();
+            try { Ui.Post(() => answered.Set()); } catch { continue; }
+            if (answered.Wait(250)) continue;
+            // no answer: wait on, telling a long freeze already while it lasts (a hang that never ends is still seen)
+            bool told = false;
+            while (!answered.Wait(1000))
+            {
+                double so = Stopwatch.GetElapsedTime(start).TotalMilliseconds;
+                if (!told && so > 5000) { told = true; Write("FREEZE", $"the interface has not answered for {so:0} ms (still waiting) · {Resources()}"); }
+            }
+            double ms = Stopwatch.GetElapsedTime(start).TotalMilliseconds;
+            Write("FREEZE", $"the interface did not answer for {ms:0} ms · CPU of the PC {SystemCpu():0} %");
+        }
+    }
+
+    [DllImport("kernel32.dll")] static extern bool GetSystemTimes(out long idle, out long kernel, out long user);
+    static long _sysIdle, _sysTotal;
+
+    /// <summary>How busy the whole PC was since the last call (%): a stutter of the PC vs. of the app alone.</summary>
+    static double SystemCpu()
+    {
+        if (!GetSystemTimes(out long idle, out long kernel, out long user)) return -1;
+        long total = kernel + user;                                       // kernel time includes the idle time
+        double busy = total - _sysTotal <= 0 ? 0 : 100.0 * (1 - (double)(idle - _sysIdle) / (total - _sysTotal));
+        _sysIdle = idle;
+        _sysTotal = total;
+        return Math.Clamp(busy, 0, 100);
     }
 
     /// <summary>A changed setting with its new value (long texts shortened).</summary>
@@ -98,6 +268,21 @@ static class Diag
         return $"memory {p.WorkingSet64 / 1048576} MB (private {p.PrivateMemorySize64 / 1048576} MB, managed {GC.GetTotalMemory(false) / 1048576} MB), " +
                $"handles {p.HandleCount}, GDI {GetGuiResources(p.Handle, 0)}, USER {GetGuiResources(p.Handle, 1)}, threads {p.Threads.Count}, " +
                $"running {DateTime.Now - p.StartTime:d\\.hh\\:mm\\:ss}";
+    }
+
+    static TimeSpan _dockCpu;
+    static long _dockAt;
+
+    /// <summary>How much of the processor the dock took since the last heartbeat (% of the whole PC).</summary>
+    static double DockCpu()
+    {
+        using var p = Process.GetCurrentProcess();
+        var cpu = p.TotalProcessorTime;
+        long now = Stopwatch.GetTimestamp();
+        double result = _dockAt == 0 ? 0 : (cpu - _dockCpu).TotalMilliseconds / Stopwatch.GetElapsedTime(_dockAt, now).TotalMilliseconds / Environment.ProcessorCount * 100;
+        _dockCpu = cpu;
+        _dockAt = now;
+        return result;
     }
 
     static string Reg(string key, string name) => Registry.GetValue(key, name, null)?.ToString() ?? "?";
@@ -158,6 +343,7 @@ static class Diag
             }
             Add(archive, "system.txt", SystemInfo());
             Add(archive, "crashes.txt", Crashes());
+            Add(archive, "processes.txt", Processes());
             return zip;
         }
         catch (Exception ex)
@@ -173,13 +359,41 @@ static class Diag
         w.Write(text);
     }
 
+    /// <summary>
+    /// The processes that take the most memory and the most processor time (since they started) – when the PC is slow, whether
+    /// it is the dock or something else; also the other shells and tools that change the taskbar (they can fight the dock).
+    /// </summary>
+    static string Processes()
+    {
+        var s = new StringBuilder();
+        try
+        {
+            var all = Process.GetProcesses().Select(p =>
+            {
+                try { return (p.ProcessName, p.Id, Mem: p.WorkingSet64 / 1048576, Cpu: p.TotalProcessorTime.TotalSeconds); }
+                catch { return (p.ProcessName, p.Id, Mem: p.WorkingSet64 / 1048576, Cpu: -1.0); }
+                finally { p.Dispose(); }
+            }).ToList();
+            s.AppendLine($"Processes: {all.Count}, CPU of the PC now {SystemCpu():0} %");
+            s.AppendLine("\nThe most processor time (s, since each started):");
+            foreach (var p in all.OrderByDescending(p => p.Cpu).Take(25)) s.AppendLine($"  {p.Cpu,10:0.0}  {p.ProcessName} ({p.Id})");
+            s.AppendLine("\nThe most memory (MB):");
+            foreach (var p in all.OrderByDescending(p => p.Mem).Take(25)) s.AppendLine($"  {p.Mem,10}  {p.ProcessName} ({p.Id})");
+            string[] shells = { "StartAllBack", "ExplorerPatcher", "Start11", "StartIsBack", "RetroBar", "Cairo", "TranslucentTB", "RoundedTB", "Windhawk", "SmartTaskbar", "TaskbarX", "Stardock", "Fences", "Rainmeter", "DisplayFusion", "AutoHotkey", "PowerToys" };
+            var found = all.Select(p => p.ProcessName).Where(n => shells.Any(x => n.Contains(x, StringComparison.OrdinalIgnoreCase))).Distinct().ToList();
+            s.AppendLine("\nTools that change the taskbar or the desktop: " + (found.Count == 0 ? "none" : string.Join(", ", found)));
+        }
+        catch (Exception ex) { s.AppendLine("Processes could not be read: " + ex.Message); }
+        return s.ToString();
+    }
+
     /// <summary>The last crashes of HeMiDock in the Windows event log (errors the app could not write itself).</summary>
     static string Crashes()
     {
         try
         {
             var psi = new ProcessStartInfo("wevtutil.exe",
-                "qe Application /q:\"*[System[(Provider[@Name='.NET Runtime'] or Provider[@Name='Application Error'] or Provider[@Name='Windows Error Reporting'])]]\" /c:200 /rd:true /f:text")
+                "qe Application /q:\"*[System[(Provider[@Name='.NET Runtime'] or Provider[@Name='Application Error'] or Provider[@Name='Windows Error Reporting'] or Provider[@Name='Application Hang'])]]\" /c:200 /rd:true /f:text")
             {
                 UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, StandardOutputEncoding = Encoding.UTF8
             };

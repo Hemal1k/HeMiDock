@@ -417,12 +417,14 @@ sealed class ControlCenterWindow : PopupWindow
     }
 
     /// <summary>A row of a card: the chosen one has an accent symbol and a check mark.</summary>
-    static Button PageRow(string glyph, string text, bool on, Action click, string sub = null)
+    static Button PageRow(string glyph, string text, bool on, Action click, string sub = null, string backGlyph = null)
     {
         var texts = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
         texts.Children.Add(new TextBlock { Text = L.T(text), FontSize = 12.5, FontWeight = on ? Microsoft.UI.Text.FontWeights.SemiBold : Microsoft.UI.Text.FontWeights.Normal, TextTrimming = TextTrimming.CharacterEllipsis });
         if (sub != null) texts.Children.Add(new TextBlock { Text = L.T(sub), FontSize = 11, Foreground = Res("TextFillColorSecondaryBrush") });
         var grid = new Grid { ColumnSpacing = 10, ColumnDefinitions = { new ColumnDefinition { Width = new GridLength(26) }, new ColumnDefinition(), new ColumnDefinition { Width = GridLength.Auto } } };
+        // the signal of a network: the whole fan faint under the bars it has (one bar alone was just a dot)
+        if (backGlyph != null) grid.Children.Add(new FontIcon { Glyph = backGlyph, FontSize = 15, Opacity = 0.3, Foreground = Res("TextFillColorPrimaryBrush") });
         grid.Children.Add(new FontIcon { Glyph = glyph, FontSize = 15, Foreground = on ? Res("AccentTextFillColorPrimaryBrush") : Res("TextFillColorPrimaryBrush") });
         Grid.SetColumn(texts, 1);
         grid.Children.Add(texts);
@@ -462,6 +464,8 @@ sealed class ControlCenterWindow : PopupWindow
     // ───────────────────────── Wi-Fi ─────────────────────────
 
     readonly StackPanel _networks = new() { Spacing = 1 };
+    /// <summary>The card of the list: hidden while there is no network (Wi-Fi off) – an empty card was left before.</summary>
+    Border _networksCard;
     readonly TextBlock _wifiStatus = new() { FontSize = 12, Margin = new Thickness(8, 0, 8, 4), TextWrapping = TextWrapping.Wrap };
 
     void ShowWifi()
@@ -471,10 +475,24 @@ sealed class ControlCenterWindow : PopupWindow
         ToolTipService.SetToolTip(refresh, L.T("Scan again"));
         refresh.Click += (_, _) => _ = ScanAsync();
         _pageActions.Children.Add(refresh);
-        HeaderSwitch(_wifi?.State == RadioState.On, async on => { if (_wifi != null) { await _wifi.SetStateAsync(on ? RadioState.On : RadioState.Off); await ScanAsync(); } });
+        HeaderSwitch(_wifi?.State == RadioState.On, async on =>
+        {
+            if (_wifi == null) return;
+            if (on) _wifiStatus.Text = L.T("Searching for networks…");
+            await SwitchRadio(_wifi, on);
+            // a scan started before the switch (with Wi-Fi off) would be waited for instead of a new one
+            _scanning = null;
+            await ScanAsync();
+        });
         _wifiStatus.Foreground = Res("TextFillColorSecondaryBrush");
+        // the list and the status are kept between the visits of the page: out of the old page first (else "Element is
+        // already the child of another element" stopped the page half built – no list until it was opened again)
+        if (_networks.Parent is ScrollViewer old) old.Content = null;
+        if (_wifiStatus.Parent is Panel oldPanel) oldPanel.Children.Remove(_wifiStatus);
         _page.Children.Add(_wifiStatus);
-        _page.Children.Add(Card(new ScrollViewer { MaxHeight = 340, Content = _networks }, 4));
+        _networksCard = Card(new ScrollViewer { MaxHeight = 340, Content = _networks }, 4);
+        _networksCard.Visibility = _networks.Children.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        _page.Children.Add(_networksCard);
         Footer("More Wi-Fi settings", "ms-settings:network-wifi");
         _ = ScanAsync();
     }
@@ -510,7 +528,8 @@ sealed class ControlCenterWindow : PopupWindow
 
     async Task DoScanAsync()
     {
-        if (_wifi?.State != RadioState.On) { _networks.Children.Clear(); _wifiStatus.Text = L.T("Wi-Fi is turned off."); return; }
+        long started = System.Diagnostics.Stopwatch.GetTimestamp();
+        if (_wifi?.State != RadioState.On) { _networks.Children.Clear(); if (_networksCard != null) _networksCard.Visibility = Visibility.Collapsed; _wifiStatus.Text = L.T("Wi-Fi is turned off."); return; }
         _wifiStatus.Text = L.T("Searching for networks…");
         try
         {
@@ -527,6 +546,15 @@ sealed class ControlCenterWindow : PopupWindow
             var scan = _adapter.ScanAsync().AsTask();
             await Task.WhenAny(scan, Task.Delay(6000));
             if (_openPage == "wifi") await BuildNetworksAsync();
+            // right after Wi-Fi is switched on the first scan often finds nothing yet: once more a moment later
+            if (_openPage == "wifi" && _networks.Children.Count == 0 && _wifi?.State == RadioState.On)
+            {
+                _wifiStatus.Text = L.T("Searching for networks…");
+                await Task.Delay(2500);
+                await Task.WhenAny(_adapter.ScanAsync().AsTask(), Task.Delay(6000));
+                if (_openPage == "wifi") await BuildNetworksAsync();
+            }
+            Diag.Write("Wi-Fi", $"scan: {_networks.Children.Count} networks in {System.Diagnostics.Stopwatch.GetElapsedTime(started).TotalMilliseconds:0} ms – {_wifiStatus.Text}");
         }
         catch (Exception ex)
         {
@@ -561,6 +589,7 @@ sealed class ControlCenterWindow : PopupWindow
         _wifiStatus.Text = networks.Count == 0 ? L.T("No networks found.") : connected != null ? L.T("Connected to {0}", connected) : L.T("Not connected");
         _networks.Children.Clear();
         foreach (var n in networks) _networks.Children.Add(NetworkRow(n, n.Ssid == connected, known.Contains(n.Ssid)));
+        if (_networksCard != null) _networksCard.Visibility = networks.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
         Place();
     }
 
@@ -597,7 +626,7 @@ sealed class ControlCenterWindow : PopupWindow
         var details = new StackPanel { Margin = new Thickness(36, 6, 6, 6), Spacing = 6, Visibility = Visibility.Collapsed };
         var message = new TextBlock { FontSize = 12, TextWrapping = TextWrapping.Wrap, Foreground = Res("TextFillColorSecondaryBrush"), Visibility = Visibility.Collapsed };
         var header = PageRow(SignalGlyph(n.Bars), n.Ssid, connected, () => details.Visibility = details.Visibility == Visibility.Visible ? Visibility.Collapsed : Visibility.Visible,
-            (connected ? L.T("Connected") + ", " : "") + n.Details);
+            (connected ? L.T("Connected") + ", " : "") + n.Details, "");
         if (connected)
         {
             var disconnect = new Button { Content = L.T("Disconnect"), HorizontalAlignment = HorizontalAlignment.Right };
@@ -679,6 +708,17 @@ sealed class ControlCenterWindow : PopupWindow
         return new StackPanel { Children = { header, details } };
     }
 
+    /// <summary>
+    /// Switches a radio and waits (at most 3 s) until Windows reports the new state: read at once, it was still the old one
+    /// – the page then said "turned off" (and listed nothing) under a switch that was on.
+    /// </summary>
+    static async Task SwitchRadio(RadioSwitch radio, bool on)
+    {
+        var want = on ? RadioState.On : RadioState.Off;
+        await radio.SetStateAsync(want);
+        for (int i = 0; i < 30 && radio.State != want; i++) await Task.Delay(100);
+    }
+
     // ───────────────────────── Bluetooth ─────────────────────────
 
     void ShowBluetooth()
@@ -691,6 +731,7 @@ sealed class ControlCenterWindow : PopupWindow
 
     async Task BuildBluetoothAsync()
     {
+        long started = System.Diagnostics.Stopwatch.GetTimestamp();
         int build = ++_btBuild;                                          // a newer listing wins over a slower older one
         _bt ??= await RadioSwitch.FindAsync(RadioKind.Bluetooth);        // the radio may not have been known yet: the switch is always there
         if (build != _btBuild || _openPage != "bt") return;
@@ -699,7 +740,9 @@ sealed class ControlCenterWindow : PopupWindow
         HeaderSwitch(on, async v =>
         {
             if (_bt == null) { Open("ms-settings:bluetooth"); return; }
-            await _bt.SetStateAsync(v ? RadioState.On : RadioState.Off);
+            // the note "turned off" goes, the turning ring comes while Windows lists the devices
+            if (v) { _page.Children.Clear(); Searching("Searching for devices…"); }
+            await SwitchRadio(_bt, v);
             await BuildBluetoothAsync();
         });
         Footer("More Bluetooth settings", "ms-settings:bluetooth");
@@ -736,6 +779,7 @@ sealed class ControlCenterWindow : PopupWindow
         catch (Exception ex) { Log.Write("Bluetooth list", ex); }
         if (_openPage != "bt" || build != _btBuild) return;
         _page.Children.Clear();
+        Diag.Write("Bluetooth", $"{devices.Count} devices ({devices.Count(d => d.Connected)} connected) in {System.Diagnostics.Stopwatch.GetElapsedTime(started).TotalMilliseconds:0} ms");
         if (devices.Count == 0) { Note("No paired devices."); return; }
         var card = PageCard();
         foreach (var d in devices.OrderByDescending(d => d.Connected).ThenBy(d => d.Name))

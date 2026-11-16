@@ -16,12 +16,18 @@ sealed partial class AppBar : IDisposable
 
     readonly IntPtr _hwnd;
     bool _on;
+    // the last reservation: the same one again sends nothing (the dock is placed in every frame of its animations, and each
+    // ABM_SETPOS made Windows work out the work area again and tell every window – the whole PC stuttered)
+    (int Size, int Edge, int L, int T, int R, int B) _last;
+    Win32.RECT _lastRc;
 
     public AppBar(IntPtr hwnd) => _hwnd = hwnd;
 
     /// <summary>Reserves <paramref name="size"/> pixels along the edge of the monitor; returns the strip Windows gave.</summary>
     public Win32.RECT Reserve(int size, int edge, Native.RECT screen)
     {
+        var key = (size, edge, screen.Left, screen.Top, screen.Right, screen.Bottom);
+        if (_on && key == _last) return _lastRc;
         uint abe = edge switch { 1 => 0u, 2 => 2u, 3 => 1u, _ => 3u };       // ABE_LEFT, ABE_RIGHT, ABE_TOP, ABE_BOTTOM
         var data = new APPBARDATA { cbSize = Marshal.SizeOf<APPBARDATA>(), hWnd = _hwnd, uEdge = abe };
         if (!_on) { SHAppBarMessage(ABM_NEW, ref data); _on = true; }
@@ -43,8 +49,13 @@ sealed partial class AppBar : IDisposable
             default: data.rc.Top = data.rc.Bottom - size; break;
         }
         SHAppBarMessage(ABM_SETPOS, ref data);
+        _last = key;
+        _lastRc = data.rc;
         return data.rc;
     }
+
+    /// <summary>The next <see cref="Reserve"/> asks Windows again (another bar came or went, Explorer started again).</summary>
+    public void Forget() => _last = default;
 
     public void Dispose()
     {
@@ -52,5 +63,6 @@ sealed partial class AppBar : IDisposable
         var data = new APPBARDATA { cbSize = Marshal.SizeOf<APPBARDATA>(), hWnd = _hwnd };
         SHAppBarMessage(ABM_REMOVE, ref data);
         _on = false;
+        _last = default;
     }
 }
