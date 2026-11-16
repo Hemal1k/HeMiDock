@@ -279,6 +279,10 @@ begin
   DownloadPage := CreateDownloadPage(SetupMessage(msgWizardPreparing), SetupMessage(msgPreparingDesc), nil);
   NeedDotNet := not HasDotNet;
   NeedRuntime := not HasAppRuntime;
+  { a quiet installation without administrator rights (winget in the user scope) never installs .NET: its installer needs
+    them and would wait for a UAC prompt nobody answers (the validation of winget failed so on ARM64); winget brings .NET
+    as a dependency, otherwise Windows asks for it when HeMiDock starts }
+  if WizardSilent and not IsAdmin then NeedDotNet := False;
 #ifdef TestNeedPage
   NeedDotNet := True; NeedRuntime := True;   { ISCC /DTestNeedPage: shows the page on a PC that has everything }
 #endif
