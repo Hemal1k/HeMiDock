@@ -86,6 +86,19 @@ Filename: "{app}\HeMiDock.exe"; Parameters: "--after-update"; Flags: nowait runa
 
 [UninstallRun]
 Filename: "{app}\HeMiDock.exe"; Parameters: "--uninstall"; Flags: waituntilterminated; RunOnceId: "HeMiDockUninstall"
+; the same once more without the app (when it could not run): the task of the start at sign-in
+Filename: "{sys}\schtasks.exe"; Parameters: "/Delete /TN ""HeMiDock ({username})"" /F"; Flags: runhidden; RunOnceId: "HeMiDockTask"
+
+[Registry]
+; the start at sign-in (also the name of the test builds) and what Windows itself keeps about the app (its name in
+; menus, "Open with", Task Manager → Startup apps) – removed with it
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: none; ValueName: "HeMiDock"; Flags: uninsdeletevalue dontcreatekey
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: none; ValueName: "HeMiDock.WinUI"; Flags: uninsdeletevalue dontcreatekey
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run"; ValueType: none; ValueName: "HeMiDock"; Flags: uninsdeletevalue dontcreatekey
+Root: HKCU; Subkey: "Software\Classes\Local Settings\Software\Microsoft\Windows\Shell\MuiCache"; ValueType: none; ValueName: "{app}\HeMiDock.exe.FriendlyAppName"; Flags: uninsdeletevalue dontcreatekey
+Root: HKCU; Subkey: "Software\Classes\Local Settings\Software\Microsoft\Windows\Shell\MuiCache"; ValueType: none; ValueName: "{app}\HeMiDock.exe.ApplicationCompany"; Flags: uninsdeletevalue dontcreatekey
+Root: HKCU; Subkey: "Software\Classes\Applications\HeMiDock.exe"; Flags: uninsdeletekey dontcreatekey
+Root: HKCU; Subkey: "Software\HeMi"; Flags: uninsdeletekeyifempty dontcreatekey
 
 [Code]
 const

@@ -268,7 +268,7 @@ sealed partial class DockWindow
             e.Handled = true;
             int at = entry.Windows.FindIndex(w => w.Active);
             var next = entry.Windows[((at < 0 ? 0 : at) + (e.GetCurrentPoint(button).Properties.MouseWheelDelta < 0 ? 1 : -1) + entry.Windows.Count) % entry.Windows.Count];
-            if (Win32.IsIconic(next.Handle)) Win32.ShowWindow(next.Handle, Win32.SW_RESTORE);
+            Fg.Restore(next.Handle);
             Fg.Force(next.Handle);
         };
         button.PointerEntered += (_, _) =>

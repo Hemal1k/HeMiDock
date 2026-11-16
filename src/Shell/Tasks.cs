@@ -215,7 +215,7 @@ static class Launcher
     public static void Activate(TaskWindow w)
     {
         if (Win32.GetForegroundWindow() == w.Handle && !Win32.IsIconic(w.Handle)) { Win32.ShowWindow(w.Handle, Win32.SW_MINIMIZE); return; }
-        if (Win32.IsIconic(w.Handle)) Win32.ShowWindow(w.Handle, Win32.SW_RESTORE);
+        Fg.Restore(w.Handle);
         // Windows refuses SetForegroundWindow now and then (the window only blinked in the taskbar and Alt+Tab was
         // needed): Force attaches to the input of the window in front and, if still refused, presses Alt shortly
         Native.AllowSetForegroundWindow(Native.ASFW_ANY);

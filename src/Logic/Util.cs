@@ -85,6 +85,15 @@ sealed class ClickAway
 /// <summary>Helpers for the foreground window and on-screen positions of elements.</summary>
 static class Fg
 {
+    /// <summary>Restores a minimized window. A window of a program running as administrator ignores ShowWindow from the
+    /// dock (it is not elevated), so then the window is switched to as by Alt+Tab, which Windows allows.</summary>
+    public static void Restore(IntPtr h)
+    {
+        if (h == IntPtr.Zero || !Native.IsIconic(h)) return;
+        Native.ShowWindow(h, 9);                                      // SW_RESTORE
+        if (Native.IsIconic(h)) Native.SwitchToThisWindow(h, true);
+    }
+
     /// <summary>Brings a window to the foreground even when the process did not get the last input (the dock is NOACTIVATE).</summary>
     public static void Force(IntPtr h)
     {

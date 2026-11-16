@@ -183,7 +183,7 @@ sealed class PreviewWindow : Window
 
     static void Bring(TaskWindow w)
     {
-        if (Win32.IsIconic(w.Handle)) Win32.ShowWindow(w.Handle, Win32.SW_RESTORE);
+        Fg.Restore(w.Handle);
         Fg.Force(w.Handle);
     }
 
