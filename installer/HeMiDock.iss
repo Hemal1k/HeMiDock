@@ -81,7 +81,9 @@ Name: "{autodesktop}\HeMiDock"; Filename: "{app}\HeMiDock.exe"; Tasks: desktopic
 
 [Run]
 ; the File Explorer items and the start with Windows point to this installation (also after a move from the old folder)
-Filename: "{app}\HeMiDock.exe"; Parameters: "--repair"; Flags: runasoriginaluser waituntilterminated runhidden
+; not waited for: on a PC without the Windows App Runtime (a quiet install that could not add it) the app would wait for an
+; answer to the question of Windows about it, and Setup would never end
+Filename: "{app}\HeMiDock.exe"; Parameters: "--repair"; Flags: runasoriginaluser nowait runhidden
 ; after an interactive installation: offered; after an update (quiet): the dock starts again by itself
 ; (as the user who started the installer – never as administrator after an installation for all users)
 Filename: "{app}\HeMiDock.exe"; Description: "{cm:LaunchAfter}"; Flags: nowait postinstall skipifsilent runasoriginaluser
@@ -332,7 +334,8 @@ begin
       DownloadPage.Download;
     except
       SuppressibleMsgBox(AddPeriod(GetExceptionMessage), mbCriticalError, MB_OK, IDOK);
-      Result := False;
+      { no download (no internet): a quiet install goes on, the app asks for what is missing when it starts }
+      Result := WizardSilent;
       Exit;
     end;
     if NeedDotNet then
@@ -341,7 +344,8 @@ begin
       if not RunElevated(ExpandConstant('{tmp}\dotnet-runtime.exe'), '/install /quiet /norestart') or not HasDotNet then
       begin
         SuppressibleMsgBox(FmtMessage(CustomMessage('PrereqFailed'), ['.NET 10 Runtime (' + Arch + ')', 'https://dotnet.microsoft.com/download/dotnet/10.0']), mbError, MB_OK, IDOK);
-        Result := False;
+        { a quiet install goes on without it: winget brings .NET as a dependency, and Windows asks for it at the start }
+        Result := WizardSilent;
         Exit;
       end;
     end;
@@ -351,7 +355,8 @@ begin
       if not RunPlain(ExpandConstant('{tmp}\windowsappruntimeinstall.exe'), '--quiet') or not HasAppRuntime then
       begin
         SuppressibleMsgBox(FmtMessage(CustomMessage('PrereqFailed'), ['Windows App Runtime 2.6 (' + Arch + ')', 'https://learn.microsoft.com/windows/apps/windows-app-sdk/downloads']), mbError, MB_OK, IDOK);
-        Result := False;
+        { a quiet install goes on without it: Windows offers it when HeMiDock starts }
+        Result := WizardSilent;
         Exit;
       end;
     end;
