@@ -24,7 +24,7 @@
     <AssemblyName>HeMiDock</AssemblyName>
     <Product>HeMiDock</Product>
     <!-- big changes +1, smaller +0.1, really small +0.0.1 -->
-    <Version>1.9.0</Version>
+    <Version>1.9.1</Version>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == ''">win-x64</RuntimeIdentifier>
     <Platforms>x64;ARM64</Platforms>
@@ -45,7 +45,7 @@
     <NoWarn>$(NoWarn);CS0168;CS0169;CS0414;CS0649;CS0618;CS1998;CA1416;SYSLIB1054;CS8981</NoWarn>
   </PropertyGroup>
 
-  <!-- -p:Portable=true: the release that runs without installing anything – .NET and the Windows App Runtime inside (both
+  <!-- -p:Portable=true: the release that runs without installing anything â€“ .NET and the Windows App Runtime inside (both
        may be given out with an app: .NET under the MIT license, the runtime of the Windows App SDK as its "distributable
        code"; their licenses are in Assets\ThirdPartyNotices.txt). As small as it goes: .NET trimmed to what is used
        (partial: only the parts of .NET marked as safe to trim; the app and its other libraries stay whole) -->
@@ -59,7 +59,7 @@
     <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
     <JsonSerializerIsReflectionEnabledByDefault>true</JsonSerializerIsReflectionEnabledByDefault>
     <SuppressTrimAnalysisWarnings>true</SuppressTrimAnalysisWarnings>
-    <!-- the WinRT glue of the own classes made at build time (they have to be partial – CsWinRT1028 – or a window refused
+    <!-- the WinRT glue of the own classes made at build time (they have to be partial â€“ CsWinRT1028 â€“ or a window refused
          the own acrylic: "Specified cast is not valid") -->
     <CsWinRTAotOptimizerEnabled>true</CsWinRTAotOptimizerEnabled>
     <!-- only the languages of the app -->
@@ -90,7 +90,7 @@
         Or '%(Filename)%(Extension)' == 'Microsoft.Windows.Widgets.dll' Or '%(Filename)' == 'PerceptiveStreaming' Or '%(Filename)' == 'NPUDetect'
         Or $([System.String]::Copy('%(Filename)').StartsWith('Microsoft.Windows.Workloads')) Or '%(Filename)%(Extension)' == 'Microsoft.Graphics.Imaging.dll'
         Or '%(Filename)' == 'RestartAgent' Or '%(Filename)' == 'PushNotificationsLongRunningTask.ProxyStub'" />
-      <!-- the full licenses of what the portable release carries (Settings → About → Licenses names them) -->
+      <!-- the full licenses of what the portable release carries (Settings â†’ About â†’ Licenses names them) -->
       <ResolvedFileToPublish Include="$(NuGetPackageRoot)microsoft.netcore.app.runtime.$(RuntimeIdentifier)\$(BundledNETCoreAppPackageVersion)\LICENSE.TXT" RelativePath="Licenses\.NET - LICENSE.txt" CopyToPublishDirectory="PreserveNewest" />
       <ResolvedFileToPublish Include="$(NuGetPackageRoot)microsoft.netcore.app.runtime.$(RuntimeIdentifier)\$(BundledNETCoreAppPackageVersion)\THIRD-PARTY-NOTICES.TXT" RelativePath="Licenses\.NET - THIRD-PARTY-NOTICES.txt" CopyToPublishDirectory="PreserveNewest" />
       <ResolvedFileToPublish Include="$(NuGetPackageRoot)microsoft.windowsappsdk\2.6.4\license.txt" RelativePath="Licenses\Windows App SDK - license.txt" CopyToPublishDirectory="PreserveNewest" />
@@ -122,7 +122,7 @@
   </Target>
 
   <ItemGroup>
-    <!-- when this build was made (Settings → About) -->
+    <!-- when this build was made (Settings â†’ About) -->
     <AssemblyMetadata Include="BuildDate" Value="$([System.DateTime]::UtcNow.ToString(&quot;o&quot;))" />
   </ItemGroup>
 
@@ -130,7 +130,7 @@
     <!-- the logo of the guide and the icon of the windows -->
     <Content Include="Assets\HeMiDock.png" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="Assets\HeMiDock.ico" CopyToOutputDirectory="PreserveNewest" />
-    <!-- Settings → About → Licenses (with the full license of ManagedShell, which its license asks for) -->
+    <!-- Settings â†’ About â†’ Licenses (with the full license of ManagedShell, which its license asks for) -->
     <Content Include="Assets\ThirdPartyNotices.txt" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
