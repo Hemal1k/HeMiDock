@@ -11,18 +11,14 @@ namespace HeMiDock;
 /// </summary>
 static class ToastMover
 {
-    delegate void WinEventProc(IntPtr hook, uint ev, IntPtr hwnd, int obj, int child, uint thread, uint time);
-    [DllImport("user32.dll")] static extern IntPtr SetWinEventHook(uint min, uint max, IntPtr module, WinEventProc proc, uint pid, uint thread, uint flags);
-    [DllImport("user32.dll")] static extern bool UnhookWinEvent(IntPtr hook);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetClassName(IntPtr h, System.Text.StringBuilder s, int n);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetWindowText(IntPtr h, System.Text.StringBuilder s, int n);
 
-    const uint EVENT_OBJECT_SHOW = 0x8002, EVENT_OBJECT_LOCATIONCHANGE = 0x800B, EVENT_OBJECT_UNCLOAKED = 0x8018;
-    const uint WINEVENT_OUTOFCONTEXT = 0, WINEVENT_SKIPOWNPROCESS = 2;
     const uint SwpMoveOnly = 0x1 | 0x4 | 0x10;                        // NOSIZE | NOZORDER | NOACTIVATE
 
-    static readonly WinEventProc Proc = OnEvent;                     // kept alive while hooked
-    static IntPtr _show, _move, _uncloak;
+    static readonly WinEvents.Handler Proc = (ev, hwnd, obj, child) => OnEvent(ev, hwnd, obj, child);
+    static readonly uint[] Events = { WinEvents.Show, WinEvents.LocationChange, WinEvents.Uncloaked };
+    static bool _on;
     static readonly Dictionary<IntPtr, bool> Known = new();          // window → is the notification window (it lives long)
     static IntPtr _toast;                                            // the notification window last moved
 
@@ -35,21 +31,17 @@ static class ToastMover
 
     public static void Apply(bool on)
     {
-        if (on == (_show != IntPtr.Zero)) return;
+        if (on == _on) return;
+        _on = on;
         if (on)
         {
-            _show = SetWinEventHook(EVENT_OBJECT_SHOW, EVENT_OBJECT_SHOW, IntPtr.Zero, Proc, 0, 0, WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS);
-            _move = SetWinEventHook(EVENT_OBJECT_LOCATIONCHANGE, EVENT_OBJECT_LOCATIONCHANGE, IntPtr.Zero, Proc, 0, 0, WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS);
-            // the window of the notifications is shown while still cloaked (invisible) and uncloaked only later – it was not
-            // a notification at the moment it was shown, and stayed in the corner (another notebook)
-            _uncloak = SetWinEventHook(EVENT_OBJECT_UNCLOAKED, EVENT_OBJECT_UNCLOAKED, IntPtr.Zero, Proc, 0, 0, WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS);
+            // shown, moved, and uncloaked: the window of the notifications is shown while still cloaked (invisible) and
+            // uncloaked only later – it was not a notification at the moment it was shown, and stayed in the corner (another notebook)
+            foreach (var ev in Events) WinEvents.On(ev, Proc);
             Diag.Write("Notifications", "shown at the dock");
             return;
         }
-        UnhookWinEvent(_show);
-        UnhookWinEvent(_move);
-        UnhookWinEvent(_uncloak);
-        _show = _move = _uncloak = IntPtr.Zero;
+        foreach (var ev in Events) WinEvents.Off(ev, Proc);
         // back into the corner right away (Windows itself would do it only with the next notification)
         if (_toast != IntPtr.Zero && Native.IsWindowVisible(_toast) && Native.GetWindowRect(_toast, out var r))
         {
@@ -66,7 +58,7 @@ static class ToastMover
         return all.FirstOrDefault(m => m.Handle == handle) ?? all[0];
     }
 
-    static void OnEvent(IntPtr hook, uint ev, IntPtr hwnd, int obj, int child, uint thread, uint time)
+    static void OnEvent(uint ev, IntPtr hwnd, int obj, int child)
     {
         if (obj != 0 || child != 0 || hwnd == IntPtr.Zero) return;   // only whole windows (not the cursor, carets …)
         try

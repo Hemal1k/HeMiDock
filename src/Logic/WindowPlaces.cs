@@ -11,17 +11,15 @@ namespace HeMiDock;
 /// </summary>
 static class WindowPlaces
 {
-    delegate void WinEventProc(IntPtr hook, uint ev, IntPtr hwnd, int idObject, int idChild, uint thread, uint time);
-    [DllImport("user32.dll")] static extern IntPtr SetWinEventHook(uint min, uint max, IntPtr module, WinEventProc proc, uint pid, uint thread, uint flags);
-    [DllImport("user32.dll")] static extern bool UnhookWinEvent(IntPtr hook);
     [DllImport("user32.dll")] static extern IntPtr GetAncestor(IntPtr h, uint flags);
     [DllImport("user32.dll")] static extern bool IsZoomed(IntPtr h);
 
     const uint EVENT_OBJECT_DESTROY = 0x8001, EVENT_OBJECT_SHOW = 0x8002, EVENT_OBJECT_HIDE = 0x8003, EVENT_OBJECT_LOCATIONCHANGE = 0x800B;
-    const uint WINEVENT_OUTOFCONTEXT = 0, WINEVENT_SKIPOWNPROCESS = 2;
 
-    static readonly WinEventProc Proc = OnEvent;                          // kept alive: Windows calls it
-    static IntPtr _hook;
+    static readonly WinEvents.Handler Proc = (ev, h, obj, child) => OnEvent(ev, h, obj, child);
+    // only these four (the hook took the whole range between them: also the focus, selection and state changes of every app)
+    static readonly uint[] Events = { EVENT_OBJECT_DESTROY, EVENT_OBJECT_SHOW, EVENT_OBJECT_HIDE, EVENT_OBJECT_LOCATIONCHANGE };
+    static bool _on;
 
     /// <summary>The place of each open window (its program and its last normal rectangle).</summary>
     static readonly Dictionary<IntPtr, (string Exe, Native.RECT Rect)> Open = new();
@@ -31,15 +29,16 @@ static class WindowPlaces
     /// <summary>On the thread of the interface (the events come by its message loop).</summary>
     public static void Start()
     {
-        if (_hook != IntPtr.Zero) return;
-        _hook = SetWinEventHook(EVENT_OBJECT_DESTROY, EVENT_OBJECT_LOCATIONCHANGE, IntPtr.Zero, Proc, 0, 0, WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS);
+        if (_on) return;
+        _on = true;
+        foreach (var ev in Events) WinEvents.On(ev, Proc);
     }
 
     public static void Stop()
     {
-        if (_hook == IntPtr.Zero) return;
-        UnhookWinEvent(_hook);
-        _hook = IntPtr.Zero;
+        if (!_on) return;
+        _on = false;
+        foreach (var ev in Events) WinEvents.Off(ev, Proc);
         Open.Clear();
         Closed.Clear();
     }
@@ -51,7 +50,7 @@ static class WindowPlaces
         && (Native.GetWindowLong(h, -20) & 0x80) == 0                                          // not WS_EX_TOOLWINDOW
         && !IsZoomed(h) && !Native.IsIconic(h);
 
-    static void OnEvent(IntPtr hook, uint ev, IntPtr h, int idObject, int idChild, uint thread, uint time)
+    static void OnEvent(uint ev, IntPtr h, int idObject, int idChild)
     {
         if (idObject != 0 || idChild != 0 || h == IntPtr.Zero) return;   // the window itself, not a part of it
         try

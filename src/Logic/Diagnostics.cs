@@ -56,7 +56,7 @@ static class Diag
             StartWatching();                                              // the freeze watch and the events of Windows (they write only in debug mode)
             // once the app has started (docks, tray icons) – a moment later
             Task.Delay(3000).ContinueWith(_ => Write("System", "\n" + SystemInfo()));
-            _beat ??= new Timer(_ => Write("Heartbeat", Resources() + $", CPU of the dock {DockCpu():0.0} %, of the PC {SystemCpu():0} %"));
+            _beat ??= new Timer(_ => Write("Heartbeat", Resources() + $", CPU of the dock {DockCpu():0.0} %, of the PC {SystemCpu():0} %, window events: {WinEvents.TakeCounts()}"));
             _beat.Change(TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(5));
         }
         else _beat?.Change(Timeout.Infinite, Timeout.Infinite);

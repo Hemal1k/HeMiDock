@@ -9,41 +9,29 @@ namespace HeMiDock;
 /// </summary>
 static class WindowOutlines
 {
-    const uint EVENT_SYSTEM_FOREGROUND = 0x3, EVENT_OBJECT_SHOW = 0x8002, WINEVENT_OUTOFCONTEXT = 0, WINEVENT_SKIPOWNPROCESS = 2;
     const int OBJID_WINDOW = 0, GWL_STYLE = -16, WS_CHILD = 0x40000000, WS_CAPTION = 0xC00000, WS_THICKFRAME = 0x40000;
     const int ColorNone = unchecked((int)0xFFFFFFFE), ColorDefault = unchecked((int)0xFFFFFFFF);
 
-    delegate void WinEventProc(IntPtr hook, uint ev, IntPtr hwnd, int obj, int child, uint thread, uint time);
     delegate bool EnumProc(IntPtr hwnd, IntPtr param);
 
-    [DllImport("user32.dll")] static extern IntPtr SetWinEventHook(uint min, uint max, IntPtr module, WinEventProc proc, uint pid, uint thread, uint flags);
-    [DllImport("user32.dll")] static extern bool UnhookWinEvent(IntPtr hook);
     [DllImport("user32.dll")] static extern bool EnumWindows(EnumProc proc, IntPtr param);
     [DllImport("user32.dll")] static extern IntPtr GetWindow(IntPtr h, uint cmd);
 
-    static readonly WinEventProc Proc = OnEvent;                     // kept alive while Windows calls it
-    static IntPtr _show, _foreground;
+    static readonly WinEvents.Handler Proc = (_, hwnd, obj, child) => OnEvent(hwnd, obj, child);
+    static bool _on;
 
     /// <param name="hidden">No line around the windows.</param>
     public static void Apply(bool hidden)
     {
-        bool on = _show != IntPtr.Zero;
-        if (on == hidden) return;
-        if (hidden)
-        {
-            _show = SetWinEventHook(EVENT_OBJECT_SHOW, EVENT_OBJECT_SHOW, IntPtr.Zero, Proc, 0, 0, WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS);
-            _foreground = SetWinEventHook(EVENT_SYSTEM_FOREGROUND, EVENT_SYSTEM_FOREGROUND, IntPtr.Zero, Proc, 0, 0, WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS);
-        }
-        else
-        {
-            UnhookWinEvent(_show);
-            UnhookWinEvent(_foreground);
-            _show = _foreground = IntPtr.Zero;
-        }
+        if (_on == hidden) return;
+        _on = hidden;
+        // shown and brought to the front (an app may set its own line again)
+        foreach (var ev in new[] { WinEvents.Show, WinEvents.Foreground })
+            if (hidden) WinEvents.On(ev, Proc); else WinEvents.Off(ev, Proc);
         EnumWindows((h, _) => { Set(h, hidden ? ColorNone : ColorDefault); return true; }, IntPtr.Zero);
     }
 
-    static void OnEvent(IntPtr hook, uint ev, IntPtr hwnd, int obj, int child, uint thread, uint time)
+    static void OnEvent(IntPtr hwnd, int obj, int child)
     {
         if (obj == OBJID_WINDOW && child == 0) Set(hwnd, ColorNone);
     }

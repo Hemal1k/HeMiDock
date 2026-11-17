@@ -1,37 +1,40 @@
-using System.Runtime.InteropServices;
-
 namespace HeMiDock;
 
 /// <summary>
-/// Windows shown, hidden, closed, renamed or brought to the front – for the dock while ManagedShell does not run (it could
-/// not start). The hook starts with the first handler of <see cref="Changed"/>.
+/// The windows of the dock: shown, hidden, closed, renamed or brought to the front – for the dock while ManagedShell does not
+/// run (it could not start) – and closed or hidden at once also while it runs. Both through the one watch of <see cref="WinEvents"/>.
 /// </summary>
 static class WindowEvents
 {
-    delegate void WinEventProc(IntPtr hook, uint ev, IntPtr hwnd, int obj, int child, uint thread, uint time);
-    [DllImport("user32.dll")] static extern IntPtr SetWinEventHook(uint min, uint max, IntPtr module, WinEventProc proc, uint pid, uint thread, uint flags);
-    [DllImport("user32.dll")] static extern bool UnhookWinEvent(IntPtr hook);
-
-    static readonly WinEventProc Proc = (_, _, _, obj, _, _, _) => { if (obj == 0) _changed?.Invoke(); };
-    static readonly List<IntPtr> Hooks = new();
+    static readonly uint[] ChangeEvents = { WinEvents.Foreground, WinEvents.Destroy, WinEvents.Show, WinEvents.Hide, WinEvents.NameChange };
+    static readonly WinEvents.Handler ChangeProc = (_, _, obj, _) => { if (obj == 0) _changed?.Invoke(); };
     static Action _changed;
 
+    /// <summary>Any window shown, hidden, closed, renamed or brought to the front (without ManagedShell).</summary>
     public static event Action Changed
     {
         add
         {
+            bool first = _changed == null;
             _changed += value;
-            if (Hooks.Count > 0) return;
-            foreach (var (min, max) in new (uint, uint)[] { (3, 3), (0x8001, 0x8003), (0x800C, 0x800C) })   // foreground; destroy, show, hide; name change
-                Hooks.Add(SetWinEventHook(min, max, IntPtr.Zero, Proc, 0, 0, 2));                       // out of context, not the own windows
+            if (first) foreach (var ev in ChangeEvents) WinEvents.On(ev, ChangeProc);
         }
-        remove => _changed -= value;
+        remove
+        {
+            _changed -= value;
+            if (_changed == null) Stop();
+        }
+    }
+
+    public static void Stop()
+    {
+        foreach (var ev in ChangeEvents) WinEvents.Off(ev, ChangeProc);
     }
 
     // ───────────────────────── windows gone ─────────────────────────
 
-    static readonly WinEventProc GoneProc = (_, _, hwnd, obj, child, _, _) => { if (obj == 0 && child == 0 && hwnd != IntPtr.Zero) _gone?.Invoke(hwnd); };
-    static readonly List<IntPtr> GoneHooks = new();
+    static readonly uint[] GoneEvents = { WinEvents.Destroy, WinEvents.Hide, WinEvents.Cloaked };
+    static readonly WinEvents.Handler GoneProc = (_, hwnd, obj, child) => { if (obj == 0 && child == 0 && hwnd != IntPtr.Zero) _gone?.Invoke(hwnd); };
     static Action<IntPtr> _gone;
 
     /// <summary>
@@ -44,23 +47,14 @@ static class WindowEvents
     {
         add
         {
+            bool first = _gone == null;
             _gone += value;
-            if (GoneHooks.Count > 0) return;
-            foreach (uint ev in new uint[] { 0x8001, 0x8003, 0x8017 })        // EVENT_OBJECT_DESTROY, _HIDE, _CLOAKED
-                GoneHooks.Add(SetWinEventHook(ev, ev, IntPtr.Zero, GoneProc, 0, 0, 2));
+            if (first) foreach (var ev in GoneEvents) WinEvents.On(ev, GoneProc);
         }
         remove
         {
             _gone -= value;
-            if (_gone != null) return;
-            foreach (var h in GoneHooks) UnhookWinEvent(h);
-            GoneHooks.Clear();
+            if (_gone == null) foreach (var ev in GoneEvents) WinEvents.Off(ev, GoneProc);
         }
-    }
-
-    public static void Stop()
-    {
-        foreach (var h in Hooks) UnhookWinEvent(h);
-        Hooks.Clear();
     }
 }

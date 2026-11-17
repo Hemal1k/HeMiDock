@@ -11,14 +11,11 @@ namespace HeMiDock;
 static class WindowManager
 {
     const uint EVENT_MOVESIZESTART = 0xA, EVENT_MOVESIZEEND = 0xB;
-    delegate void WinEventProc(IntPtr hook, uint ev, IntPtr hwnd, int obj, int child, uint thread, uint time);
-    [DllImport("user32.dll")] static extern IntPtr SetWinEventHook(uint min, uint max, IntPtr module, WinEventProc proc, uint pid, uint thread, uint flags);
-    [DllImport("user32.dll")] static extern bool UnhookWinEvent(IntPtr hook);
     [DllImport("user32.dll")] static extern bool IsZoomed(IntPtr h);
     [DllImport("dwmapi.dll")] static extern int DwmGetWindowAttribute(IntPtr h, int attr, out Native.RECT r, int size);
 
-    static readonly WinEventProc Proc = OnMoveSize;
-    static IntPtr _hook;
+    static readonly WinEvents.Handler Proc = (ev, hwnd, obj, child) => OnMoveSize(ev, hwnd, obj, child);
+    static bool _on;
     static bool _zonesShown;
     static IntPtr _moving;
     static DispatcherTimer _track;
@@ -28,10 +25,11 @@ static class WindowManager
     {
         RefreshMarks();
         bool on = DockSettings.Current.ZonesOn;
-        if (on == (_hook != IntPtr.Zero)) return;
-        if (on) _hook = SetWinEventHook(EVENT_MOVESIZESTART, EVENT_MOVESIZEEND, IntPtr.Zero, Proc, 0, 0, 2);   // out of context, not our windows' events only
-        else { UnhookWinEvent(_hook); _hook = IntPtr.Zero; }
-        Diag.Write("Zones", on ? (_hook != IntPtr.Zero ? "on" : "on, but the hook failed") : "off");
+        if (on == _on) return;
+        _on = on;
+        foreach (var ev in new[] { WinEvents.MoveSizeStart, WinEvents.MoveSizeEnd })
+            if (on) WinEvents.On(ev, Proc); else WinEvents.Off(ev, Proc);
+        Diag.Write("Zones", on ? "on" : "off");
     }
 
     /// <summary>Parts of the screen (share of its work area).</summary>
@@ -54,7 +52,7 @@ static class WindowManager
         return Array.FindIndex(Zones, z => z.Contains(new Point(Math.Clamp(x, 0, .999), Math.Clamp(y, 0, .999))));
     }
 
-    static void OnMoveSize(IntPtr hook, uint ev, IntPtr hwnd, int obj, int child, uint thread, uint time)
+    static void OnMoveSize(uint ev, IntPtr hwnd, int obj, int child)
     {
         if (obj != 0 || child != 0) return;
         if (ev == EVENT_MOVESIZESTART)

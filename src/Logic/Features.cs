@@ -12,15 +12,11 @@ namespace HeMiDock;
 static class AppRules
 {
     public const string Maximized = "max";
-    delegate void WinEventProc(IntPtr hook, uint ev, IntPtr hwnd, int obj, int child, uint thread, uint time);
-    [DllImport("user32.dll")] static extern IntPtr SetWinEventHook(uint min, uint max, IntPtr module, WinEventProc proc, uint pid, uint thread, uint flags);
-    [DllImport("user32.dll")] static extern bool UnhookWinEvent(IntPtr hook);
     [DllImport("user32.dll")] static extern IntPtr GetWindow(IntPtr h, uint cmd);
 
-    const uint EVENT_OBJECT_SHOW = 0x8002;
     const int WS_CAPTION = 0xC00000;
-    static readonly WinEventProc Proc = OnShow;
-    static IntPtr _hook;
+    static readonly WinEvents.Handler OnShowEvent = (_, hwnd, obj, child) => OnShow(hwnd, obj, child);
+    static bool _on;
     static readonly HashSet<IntPtr> Seen = new();
 
     public static Dictionary<string, string> All()
@@ -41,12 +37,13 @@ static class AppRules
     public static void Apply()
     {
         bool on = DockSettings.Current.AppRules.Length > 0;
-        if (on == (_hook != IntPtr.Zero)) return;
-        if (on) _hook = SetWinEventHook(EVENT_OBJECT_SHOW, EVENT_OBJECT_SHOW, IntPtr.Zero, Proc, 0, 0, 2);   // out of context, not our own windows
-        else { UnhookWinEvent(_hook); _hook = IntPtr.Zero; Seen.Clear(); }
+        if (on == _on) return;
+        _on = on;
+        if (on) WinEvents.On(WinEvents.Show, OnShowEvent);
+        else { WinEvents.Off(WinEvents.Show, OnShowEvent); Seen.Clear(); }
     }
 
-    static void OnShow(IntPtr hook, uint ev, IntPtr hwnd, int obj, int child, uint thread, uint time)
+    static void OnShow(IntPtr hwnd, int obj, int child)
     {
         if (obj != 0 || child != 0 || hwnd == IntPtr.Zero || Seen.Contains(hwnd)) return;
         try
