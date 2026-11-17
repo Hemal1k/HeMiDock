@@ -24,7 +24,7 @@
     <AssemblyName>HeMiDock</AssemblyName>
     <Product>HeMiDock</Product>
     <!-- big changes +1, smaller +0.1, really small +0.0.1 -->
-    <Version>1.9.1</Version>
+    <Version>1.9.2</Version>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == ''">win-x64</RuntimeIdentifier>
     <Platforms>x64;ARM64</Platforms>
@@ -39,6 +39,11 @@
     <PublishReadyToRun Condition="'$(Configuration)' == 'Release'">true</PublishReadyToRun>
     <!-- Program.cs starts the app: the watchdog runs without WinUI -->
     <DefineConstants>$(DefineConstants);DISABLE_XAML_GENERATED_MAIN</DefineConstants>
+    <!-- the Windows App Runtime is looked for by Program.Main, not before it (the automatic one ran first at every start of
+         HeMiDock.exe: without the runtime even the repair run of the installer asked about it with a window – winget failed) -->
+    <WindowsAppSdkBootstrapInitialize>false</WindowsAppSdkBootstrapInitialize>
+    <WindowsAppSdkIncludeVersionInfo>true</WindowsAppSdkIncludeVersionInfo>
+    <DefineConstants Condition="'$(Portable)' != 'true'">$(DefineConstants);HEMI_BOOTSTRAP</DefineConstants>
     <ApplicationIcon>Assets\HeMiDock.ico</ApplicationIcon>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <!-- the code of ManagedShell as it is: its own warnings are not ours -->

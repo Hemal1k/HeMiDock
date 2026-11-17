@@ -64,6 +64,11 @@ static class Program
             return;
         // started by the installer after an update: when a dock runs already, nothing (not its settings)
         if (args.Contains("--after-update") && Mutex.TryOpenExisting("HeMiDock_SingleInstance", out _)) return;
+#if HEMI_BOOTSTRAP
+        // only now the Windows App Runtime (the installed release; the portable one carries it): missing, Windows offers it
+        // with a window and the app ends – what the installer starts above never asks
+        if (!FindRuntime(out int hr)) { Environment.Exit(hr); return; }
+#endif
         WinRT.ComWrappersSupport.InitializeComWrappers();
         Application.Start(p =>
         {
@@ -71,4 +76,14 @@ static class Program
             new App();
         });
     }
+
+#if HEMI_BOOTSTRAP
+    /// <summary>In its own method: its library is loaded only here, never by what the installer starts.</summary>
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    static bool FindRuntime(out int hr) =>
+        Microsoft.Windows.ApplicationModel.DynamicDependency.Bootstrap.TryInitialize(
+            Microsoft.WindowsAppSDK.Release.MajorMinor, Microsoft.WindowsAppSDK.Release.VersionTag,
+            new Microsoft.Windows.ApplicationModel.DynamicDependency.PackageVersion(Microsoft.WindowsAppSDK.Runtime.Version.UInt64),
+            Microsoft.Windows.ApplicationModel.DynamicDependency.Bootstrap.InitializeOptions.OnNoMatch_ShowUI, out hr);
+#endif
 }
