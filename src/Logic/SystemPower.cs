@@ -27,30 +27,22 @@ static class SystemPower
         {
             if (DateTime.UtcNow - _checked < TimeSpan.FromSeconds(30)) return _pending;
             _checked = DateTime.UtcNow;
+            // only the marks of Windows Update itself – what its own power menu and its page in Settings go by. The mark of the
+            // servicing stack (Component Based Servicing\RebootPending) and the answer of the update agent (SystemInfo.RebootRequired)
+            // are also set by maintenance of Windows (Defender, the component store, a driver) that Windows offers no update for:
+            // the dock then offered "Update and restart" while Windows Update had nothing.
             bool pending = false;
+            string why = null;
             try
             {
                 using var lm = Microsoft.Win32.RegistryKey.OpenBaseKey(Microsoft.Win32.RegistryHive.LocalMachine, Microsoft.Win32.RegistryView.Registry64);
                 using (var o = lm.OpenSubKey(@"SOFTWARE\Microsoft\WindowsUpdate\Orchestrator"))
-                    pending = o?.GetValue("ShutdownFlyoutOptions") is int options && options != 0;
-                foreach (var mark in new[] { @"SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired",
-                                             @"SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending" })
-                    using (var k = lm.OpenSubKey(mark))
-                        pending |= k != null;
+                    if (o?.GetValue("ShutdownFlyoutOptions") is int options && options != 0) { pending = true; why = "ShutdownFlyoutOptions " + options; }
+                using (var k = lm.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired"))
+                    if (k != null) { pending = true; why = (why == null ? "" : why + ", ") + "Auto Update\\RebootRequired"; }
             }
             catch { }
-            if (!pending)
-                try
-                {
-                    var type = Type.GetTypeFromProgID("Microsoft.Update.SystemInfo");
-                    if (type != null)
-                    {
-                        object info = Activator.CreateInstance(type);
-                        try { pending = type.InvokeMember("RebootRequired", System.Reflection.BindingFlags.GetProperty, null, info, null) is true; }
-                        finally { Marshal.ReleaseComObject(info); }
-                    }
-                }
-                catch { }
+            if (pending != _pending) Diag.Write("Updates", pending ? "waiting for a restart: " + why : "no update waiting for a restart");
             return _pending = pending;
         }
     }

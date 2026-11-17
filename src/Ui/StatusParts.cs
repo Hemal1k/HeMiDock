@@ -179,6 +179,9 @@ sealed class StatusParts
     readonly FontIcon _shield = Glyph("");
     // a check in the shield while all is well (as the icon of Windows Security); the shield with "!" when it wants something
     readonly FontIcon _shieldCheck = new() { Glyph = "", FontSize = 8, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 1, 0, 0), IsHitTestVisible = false };
+    // the check while all is well: drawn, with the line of the shield and in its optical middle (above the geometric one – the
+    // shield ends in a point); the check of the font was thinner than the shield and sat low
+    readonly Polyline _shieldTick = new() { StrokeThickness = 1.1, StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round, StrokeLineJoin = PenLineJoin.Round, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, IsHitTestVisible = false, Visibility = Visibility.Collapsed };
     readonly Ellipse _shieldDot = new() { Width = 6, Height = 6, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, -2, -1), IsHitTestVisible = false, Visibility = Visibility.Collapsed };
     readonly Grid _security = new() { VerticalAlignment = VerticalAlignment.Center, Visibility = Visibility.Collapsed, Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent) };
     readonly Grid _updateIcon = new() { VerticalAlignment = VerticalAlignment.Center, Visibility = Visibility.Collapsed, Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent) };
@@ -222,6 +225,7 @@ sealed class StatusParts
         });
         _security.Children.Add(_shield);
         _security.Children.Add(_shieldCheck);
+        _security.Children.Add(_shieldTick);
         _security.Children.Add(_shieldDot);
         // left: the control center like the other status icons; right: the menu of Windows Security (not the control center,
         // which the right button of the status icons opens otherwise)
@@ -375,13 +379,16 @@ sealed class StatusParts
         int state = SecurityStatus.NoAntivirus ? 3 : SecurityStatus.StateOf(item.Picture);
         _shield.Glyph = state is 1 or 2 ? "\uE730" : "\uEA18";          // the shield with "!" / the shield
         _shieldCheck.Glyph = state == 3 ? "\uE711" : "\uE73E";           // inside: × / a check
-        _shieldCheck.Visibility = V(state is 0 or 3);
+        _shieldCheck.Visibility = V(state == 3);                         // × when no antivirus is on
+        _shieldTick.Visibility = V(state == 0);                          // the drawn check when all is well
         _shieldDot.Visibility = Visibility.Collapsed;
         foreach (var g in new[] { _shield, _shieldCheck })
         {
             if (state == 0) g.ClearValue(IconElement.ForegroundProperty);
             else g.Foreground = ThemeBrush.Get(state == 1 ? "SystemFillColorCautionBrush" : "SystemFillColorCriticalBrush");
         }
+        // the check in the colour of the shield (that of the dock or of the top bar, light or dark)
+        if (state == 0) _shieldTick.SetBinding(Shape.StrokeProperty, new Microsoft.UI.Xaml.Data.Binding { Source = _shield, Path = new PropertyPath("Foreground") });
         string tip = state == 3 ? L.T("No antivirus is on – the PC is not protected.") : item.Title;
         ToolTipService.SetToolTip(_security, tip);
     }
@@ -397,6 +404,18 @@ sealed class StatusParts
     {
         foreach (var g in new[] { _privacy, _place, _dnd, _vpn, _micMute, _weather, _update, _shield }) g.FontSize = S.StatusIconSize;
         _shieldCheck.FontSize = Math.Round(S.StatusIconSize * 0.6);
+        {
+            // the check in a square of the icon: half its size, half a pixel above the middle
+            double s = S.StatusIconSize, w = s * 0.5, cx = s / 2, cy = s / 2 - 0.5;
+            _shieldTick.Width = _shieldTick.Height = s;
+            _shieldTick.StrokeThickness = Math.Max(1, s * 0.075);
+            _shieldTick.Points = new PointCollection
+            {
+                new Windows.Foundation.Point(cx - w * 0.45, cy + w * 0.02),
+                new Windows.Foundation.Point(cx - w * 0.12, cy + w * 0.33),
+                new Windows.Foundation.Point(cx + w * 0.45, cy - w * 0.30),
+            };
+        }
         ShowSecurity(d.Security);
         _place.Visibility = V(d.Place.Count > 0);
         _updateIcon.Visibility = V(d.UpdateRestart);

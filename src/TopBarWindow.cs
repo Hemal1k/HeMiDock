@@ -216,6 +216,13 @@ sealed class TopBarWindow : Window, IPanelWindow
         System.Net.NetworkInformation.NetworkAddressChangedEventHandler net = (_, _) => Ui.Post(_status.Update);
         System.Net.NetworkInformation.NetworkChange.NetworkAddressChanged += net;
         _unsubscribe.Add(() => System.Net.NetworkInformation.NetworkChange.NetworkAddressChanged -= net);
+        // at once, not at the next reading: the charger plugged in or out, the network gone or back
+        Microsoft.Win32.PowerModeChangedEventHandler power = (_, _) => Ui.Post(_status.Update);
+        Microsoft.Win32.SystemEvents.PowerModeChanged += power;
+        _unsubscribe.Add(() => Microsoft.Win32.SystemEvents.PowerModeChanged -= power);
+        System.Net.NetworkInformation.NetworkAvailabilityChangedEventHandler online = (_, _) => Ui.Post(_status.Update);
+        System.Net.NetworkInformation.NetworkChange.NetworkAvailabilityChanged += online;
+        _unsubscribe.Add(() => System.Net.NetworkInformation.NetworkChange.NetworkAvailabilityChanged -= online);
         System.ComponentModel.PropertyChangedEventHandler settings = (_, _) => Ui.Post(Apply);
         S.PropertyChanged += settings; _unsubscribe.Add(() => S.PropertyChanged -= settings);
         BluetoothWatch.Start();
@@ -624,7 +631,10 @@ sealed class TopBarWindow : Window, IPanelWindow
     {
         UpdateClock();
         UpdateMonitor();
-        if (++_tick % 5 == 0) { _status.Update(); UpdateLanguage(); }
+        // the status icons every 2 s (Wi-Fi signal, battery, microphone / camera in use…), the keyboard language every 5 s
+        ++_tick;
+        if (_tick % 2 == 0) _status.Update();
+        if (_tick % 5 == 0) UpdateLanguage();
         if (_tick == 1) Place();
         // a full-screen app on this monitor: the bar steps away
         bool full = false;
