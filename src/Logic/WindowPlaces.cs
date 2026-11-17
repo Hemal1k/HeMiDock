@@ -14,11 +14,13 @@ static class WindowPlaces
     [DllImport("user32.dll")] static extern IntPtr GetAncestor(IntPtr h, uint flags);
     [DllImport("user32.dll")] static extern bool IsZoomed(IntPtr h);
 
-    const uint EVENT_OBJECT_DESTROY = 0x8001, EVENT_OBJECT_SHOW = 0x8002, EVENT_OBJECT_HIDE = 0x8003, EVENT_OBJECT_LOCATIONCHANGE = 0x800B;
+
 
     static readonly WinEvents.Handler Proc = (ev, h, obj, child) => OnEvent(ev, h, obj, child);
-    // only these four (the hook took the whole range between them: also the focus, selection and state changes of every app)
-    static readonly uint[] Events = { EVENT_OBJECT_DESTROY, EVENT_OBJECT_SHOW, EVENT_OBJECT_HIDE, EVENT_OBJECT_LOCATIONCHANGE };
+    // the place is read when a window shows, is moved by the user, comes to the front or hides – not with every change of a
+    // location: that came hundreds of times a second (the cursor, the caret, scrolling in a browser) through the thread of the
+    // interface
+    static readonly uint[] Events = { WinEvents.Destroy, WinEvents.Show, WinEvents.Hide, WinEvents.MoveSizeEnd, WinEvents.Foreground };
     static bool _on;
 
     /// <summary>The place of each open window (its program and its last normal rectangle).</summary>
@@ -44,8 +46,8 @@ static class WindowPlaces
     }
 
     /// <summary>A normal window of an app: top level, visible, with a title bar, no tool window, not maximized or minimized.</summary>
-    static bool IsAppWindow(IntPtr h) =>
-        Native.IsWindowVisible(h) && GetAncestor(h, 2) == h                                   // GA_ROOT
+    static bool IsAppWindow(IntPtr h, bool visible = true) =>
+        (!visible || Native.IsWindowVisible(h)) && GetAncestor(h, 2) == h                     // GA_ROOT
         && (Native.GetWindowLong(h, -16) & 0xC00000) == 0xC00000                              // WS_CAPTION
         && (Native.GetWindowLong(h, -20) & 0x80) == 0                                          // not WS_EX_TOOLWINDOW
         && !IsZoomed(h) && !Native.IsIconic(h);
@@ -57,21 +59,37 @@ static class WindowPlaces
         {
             switch (ev)
             {
-                case EVENT_OBJECT_LOCATIONCHANGE:
-                    if (IsAppWindow(h) && Native.VisibleBounds(h, out var r))
-                        Open[h] = (Open.TryGetValue(h, out var known) ? known.Exe : ExeOf(h), r);
+                case WinEvents.MoveSizeEnd:
+                case WinEvents.Foreground:
+                    Remember(h, visible: true);
                     break;
-                case EVENT_OBJECT_HIDE:
-                case EVENT_OBJECT_DESTROY:
+                case WinEvents.Hide:
+                    Remember(h, visible: false);                         // just hidden: its rectangle is still there
+                    if (Open.Remove(h, out var hidden) && hidden.Exe != null) Closed[hidden.Exe] = (hidden.Rect, Environment.TickCount64);
+                    break;
+                case WinEvents.Destroy:
                     if (Open.Remove(h, out var last) && last.Exe != null) Closed[last.Exe] = (last.Rect, Environment.TickCount64);
                     break;
-                case EVENT_OBJECT_SHOW:
+                case WinEvents.Show:
                     if (ExeOf(h) is { } exe && Closed.TryGetValue(exe, out var before)
                         && Environment.TickCount64 - before.At < 30 * 60_000) _ = PutBackAsync(h, exe, before.Rect);
+                    else if (IsAppWindow(h, visible: false)) _ = RememberLaterAsync(h);   // its own place, once the app has put it there
                     break;
             }
         }
         catch (Exception ex) { Log.Write("Window places", ex); }
+    }
+
+    static void Remember(IntPtr h, bool visible)
+    {
+        if (IsAppWindow(h, visible) && Native.VisibleBounds(h, out var r))
+            Open[h] = (Open.TryGetValue(h, out var known) ? known.Exe : ExeOf(h), r);
+    }
+
+    static async Task RememberLaterAsync(IntPtr h)
+    {
+        await Task.Delay(500);
+        try { if (_on) Remember(h, visible: true); } catch { }
     }
 
     static string ExeOf(IntPtr h)

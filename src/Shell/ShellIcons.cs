@@ -41,6 +41,7 @@ static class ShellIcons
             finally { ReleaseDC(IntPtr.Zero, dc); }
             return (pixels, bmp.bmWidth, bmp.bmHeight);
         }
+        catch (FileNotFoundException) { return null; }                 // a pinned or recent item that is gone (deleted, uninstalled): no icon, nothing to log
         catch (Exception ex) { Log.Write("Icon " + path, ex); return null; }
         finally { if (hbmp != IntPtr.Zero) DeleteObject(hbmp); }
     }

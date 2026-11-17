@@ -609,7 +609,7 @@ namespace ManagedShell.WindowsTray
                             if ((NIF.INFO & nicData.uFlags) != 0)
                                 handleBalloonData(nicData, trayIcon);
 
-                            ShellLogger.Debug($"NotificationArea: Added: {trayIcon.Title} Path: {trayIcon.Path} Hidden: {trayIcon.IsHidden} GUID: {trayIcon.GUID} UID: {trayIcon.UID} Version: {trayIcon.Version}");
+                            ShellLogger.Debug($"NotificationArea: Added: Path: {trayIcon.Path} Hidden: {trayIcon.IsHidden} GUID: {trayIcon.GUID} UID: {trayIcon.UID} Version: {trayIcon.Version}");
 
                             if ((NIM)message == NIM.NIM_MODIFY)
                             {
@@ -628,7 +628,7 @@ namespace ManagedShell.WindowsTray
                                 trayIcon.SetPinValues();
                             }
 
-                            ShellLogger.Debug($"NotificationArea: Modified: {trayIcon.Title}");
+                            ShellLogger.Debug($"NotificationArea: Modified: {System.IO.Path.GetFileName(trayIcon.Path)}");
                         }
                     }
                     catch (Exception ex)
@@ -646,7 +646,7 @@ namespace ManagedShell.WindowsTray
                             {
                                 TrayIcons.Remove(trayIcon);
 
-                                ShellLogger.Debug($"NotificationArea: Removed: {icon.Title}");
+                                ShellLogger.Debug($"NotificationArea: Removed: {System.IO.Path.GetFileName(icon.Path)}");
 
                                 return true;
                             }
@@ -671,7 +671,7 @@ namespace ManagedShell.WindowsTray
                         if (ti.Equals(nicData))
                         {
                             ti.Version = nicData.uVersion;
-                            ShellLogger.Debug($"NotificationArea: Modified version to {ti.Version} on: {ti.Title}");
+                            ShellLogger.Debug($"NotificationArea: Modified version to {ti.Version} on: {System.IO.Path.GetFileName(ti.Path)}");
                             break;
                         }
                     }
@@ -694,7 +694,7 @@ namespace ManagedShell.WindowsTray
                 Balloon = balloonInfo
             };
 
-            ShellLogger.Debug($"NotificationArea: Received notification \"{balloonInfo.Title}\" for {notifyIcon.Title}");
+            ShellLogger.Debug($"NotificationArea: Received a notification for {System.IO.Path.GetFileName(notifyIcon.Path)}");
 
             NotificationBalloonShown?.Invoke(this, args);
 
@@ -1315,7 +1315,7 @@ namespace ManagedShell.WindowsTray
 
         public void IconMouseUp(MouseButton button, uint mouse, int doubleClickTime)
         {
-            ShellLogger.Debug($"NotifyIcon: {button} mouse button clicked: {Title}");
+            ShellLogger.Debug($"NotifyIcon: {button} mouse button clicked: {System.IO.Path.GetFileName(Path)}");
 
             if (button == MouseButton.Left)
             {
@@ -1794,7 +1794,8 @@ namespace ManagedShell.WindowsTray
 
                                 if (handled)
                                 {
-                                    ShellLogger.Debug($"TrayService: Handled AppBar message {(ABMsg)amd.dwMessage}");
+                                    // the questions (GET...) are not logged: games and Steam ask them dozens of times a second
+                                    if (!((ABMsg)amd.dwMessage).ToString().StartsWith("ABM_GET")) ShellLogger.Debug($"TrayService: Handled AppBar message {(ABMsg)amd.dwMessage}");
                                     return abmResult;
                                 }
 

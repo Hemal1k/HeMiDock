@@ -34,7 +34,13 @@ static class ThemeWatch
     /// <summary>A window of the app follows the theme from now on.</summary>
     public static void Track(Window window)
     {
-        if (!Tracked.Any(w => w.TryGetTarget(out var known) && known == window)) Tracked.Add(new WeakReference<Window>(window));
+        if (!Tracked.Any(w => w.TryGetTarget(out var known) && known == window))
+        {
+            Tracked.Add(new WeakReference<Window>(window));
+            // a closed window out at once: its backdrop asked after it closed ended the app (an access violation, it cannot
+            // be caught – the renewed acrylic a minute after the start met a window closed meanwhile)
+            window.Closed += (_, _) => Tracked.RemoveAll(w => !w.TryGetTarget(out var known) || known == window);
+        }
         Apply(window);
     }
 

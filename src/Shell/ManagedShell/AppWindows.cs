@@ -82,6 +82,9 @@ namespace ManagedShell.WindowsTasks
 
         private string _winFileName = "";
 
+        /// <summary>The program of the window for the debug log – never its title (titles carry pages, mails, documents).</summary>
+        public string LogName => System.IO.Path.GetFileName(WinFileName ?? "");
+
         public string WinFileName
         {
             get
@@ -324,7 +327,7 @@ namespace ManagedShell.WindowsTasks
                 {
                     if (_hMonitor != IntPtr.Zero)
                     {
-                        ShellLogger.Debug($"ApplicationWindow: Monitor changed for {Handle} ({Title})");
+                        ShellLogger.Debug($"ApplicationWindow: Monitor changed for {Handle} ({LogName})");
                     }
                     _hMonitor = value;
                     OnPropertyChanged("HMonitor");
@@ -421,14 +424,14 @@ namespace ManagedShell.WindowsTasks
 
                 if (cloaked > 0)
                 {
-                    ShellLogger.Debug($"ApplicationWindow: Cloaked window {Handle} ({Title}) hidden from taskbar");
+                    ShellLogger.Debug($"ApplicationWindow: Cloaked window {Handle} ({LogName}) hidden from taskbar");
                     return false;
                 }
 
                 // UWP shell windows that are not cloaked should be hidden from the taskbar, too.
                 if (IsImmersiveShellWindow())
                 {
-                    ShellLogger.Debug($"ApplicationWindow: Hiding immersive shell window {Handle} ({Title}) from taskbar");
+                    ShellLogger.Debug($"ApplicationWindow: Hiding immersive shell window {Handle} ({LogName}) from taskbar");
                     return false;
                 }
             }
@@ -468,7 +471,7 @@ namespace ManagedShell.WindowsTasks
             }
             catch (Exception e)
             {
-                ShellLogger.Warning($"ApplicationWindow: Unable to get file description for {WinFileName} ({Title}): {e.Message}");
+                ShellLogger.Warning($"ApplicationWindow: Unable to get file description for {WinFileName}: {e.Message}");
                 desc = Title;
             }
 
@@ -636,7 +639,7 @@ namespace ManagedShell.WindowsTasks
             }
             catch (Exception e)
             {
-                ShellLogger.Error($"ApplicationWindow: Unable to get overlay icon description from process {Title}: {e.Message}");
+                ShellLogger.Error($"ApplicationWindow: Unable to get overlay icon description from process {LogName}: {e.Message}");
             }
         }
 
@@ -1105,7 +1108,7 @@ namespace ManagedShell.WindowsTasks
         {
             if (window.DoClose() != IntPtr.Zero)
             {
-                ShellLogger.Debug($"TasksService: Removing window {window.Title} from collection due to no response");
+                ShellLogger.Debug($"TasksService: Removing window {window.Handle} ({window.LogName}) from collection due to no response");
                 window.Dispose();
                 Windows.Remove(window);
             }
@@ -1128,7 +1131,7 @@ namespace ManagedShell.WindowsTasks
             if (!sanityCheck || win.CanAddToTaskbar)
             {
                 Windows.Add(win);
-                ShellLogger.Debug($"TasksService: Added window {hWnd} ({win.Title})");
+                ShellLogger.Debug($"TasksService: Added window {hWnd} ({win.LogName})");
             }
 
             // Only send TaskbarButtonCreated if we are shell, and if OS is not Server Core
@@ -1148,7 +1151,7 @@ namespace ManagedShell.WindowsTasks
                     win.Dispose();
                     Windows.Remove(win);
 
-                    ShellLogger.Debug($"TasksService: Removed window {hWnd} ({win.Title})");
+                    ShellLogger.Debug($"TasksService: Removed window {hWnd} ({win.LogName})");
                 }
                 while (Windows.Any(i => i.Handle == hWnd));
             }
@@ -1157,7 +1160,7 @@ namespace ManagedShell.WindowsTasks
         private void redrawWindow(ApplicationWindow win)
         {
             win.UpdateProperties();
-            ShellLogger.Debug($"TasksService: Updated window {win.Handle} ({win.Title})");
+            // (a change of the title is not logged: it came with every page of a browser, and says nothing without the title)
 
             foreach (ApplicationWindow wind in Windows)
             {
@@ -1229,7 +1232,7 @@ namespace ManagedShell.WindowsTasks
                                         win = Windows.First(wnd => wnd.Handle == msgCopy.LParam);
                                         win.State = ApplicationWindow.WindowState.Active;
                                         win.SetShowInTaskbar();
-                                        ShellLogger.Debug($"TasksService: Activated window {win.Handle} ({win.Title})");
+                                        ShellLogger.Debug($"TasksService: Activated window {win.Handle} ({win.LogName})");
                                     }
                                     else
                                     {
@@ -1356,7 +1359,7 @@ namespace ManagedShell.WindowsTasks
                                     }
                                     Marshal.StructureToPtr(minRectInfo, msg.LParam, false);
                                     msg.Result = (IntPtr)1;
-                                    ShellLogger.Debug($"TasksService: MinRect {minRectInfo.rc.Width}x{minRectInfo.rc.Height} provided for {win.Handle} ({win.Title})");
+                                    ShellLogger.Debug($"TasksService: MinRect {minRectInfo.rc.Width}x{minRectInfo.rc.Height} provided for {win.Handle} ({win.LogName})");
                                     return; // return here so the result isnt reset to DefWindowProc
                                 }
                                 break;
@@ -1544,7 +1547,7 @@ namespace ManagedShell.WindowsTasks
                 if (Windows.Any(i => i.Handle == hWnd))
                 {
                     ApplicationWindow win = Windows.First(wnd => wnd.Handle == hWnd);
-                    ShellLogger.Debug($"TasksService: {(eventType == EVENT_OBJECT_CLOAKED ? "Cloak" : "Uncloak")} event received for {win.Title}");
+                    ShellLogger.Debug($"TasksService: {(eventType == EVENT_OBJECT_CLOAKED ? "Cloak" : "Uncloak")} event received for {win.LogName}");
                     win.SetShowInTaskbar();
                 }
             }
