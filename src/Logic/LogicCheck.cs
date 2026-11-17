@@ -23,9 +23,9 @@ static class LogicCheck
             if (!ok) failed++;
             lines.Add($"{(ok ? "ok  " : "FAIL")}  {name}{(string.IsNullOrEmpty(got) ? "" : "   → " + got)}");
         }
-        // a number as the app writes it (in the language of the PC): spaces and non-breaking spaces of the thousands out
+        // a number as the app writes it (in the language of the PC): the thousands apart by spaces, non-breaking spaces or commas
         static double? Number(string s) =>
-            s != null && double.TryParse(s.Replace(" ", "").Replace(" ", "").Replace(" ", ""), NumberStyles.Float, CultureInfo.CurrentCulture, out double d) ? d : null;
+            s != null && double.TryParse(s.Replace(" ", "").Replace(" ", "").Replace(" ", ""), NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.CurrentCulture, out double d) ? d : null;
 
         // ── the calculator of the search
         foreach (var (text, expect) in new[] { ("2+3*4", 14.0), ("(10-4)/2", 3.0), ("7 x 6", 42.0), ("100 / 8", 12.5) })
