@@ -471,6 +471,7 @@ public partial class App : Application
     {
         try { HasBluetooth = await RadioSwitch.FindAsync(Windows.Devices.Radios.RadioKind.Bluetooth) != null; } catch { }
         try { HasCellular = await RadioSwitch.FindAsync(Windows.Devices.Radios.RadioKind.MobileBroadband) != null; } catch { }
+        QuickLayout.ChooseDefault(HasBluetooth, HasCellular);           // a new installation: four quick buttons by what the PC has
     }
 
     internal void Cleanup()

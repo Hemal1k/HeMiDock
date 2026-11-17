@@ -50,10 +50,37 @@ static class QuickLayout
         DockSettings.Current.TopBarWidgets = string.Join("|", list);
     }
 
-    public static bool IsShown(string id) => !Split(DockSettings.Current.QuickHidden).Contains(id);
+    /// <summary>The hidden ones not chosen yet (a new installation): <see cref="ChooseDefault"/> picks four quick buttons.</summary>
+    public const string Unset = "*";
+    /// <summary>After the network and the radios the PC has, the quick buttons of a new installation (four in all).</summary>
+    static readonly string[] DefaultFill = { "dnd", "night", "awake", "cast" };
+
+    /// <summary>
+    /// A new installation shows four quick buttons by what the PC has: the network (Wi-Fi or the cable), Bluetooth and
+    /// mobile data when there are such radios, then Do not disturb, Night light, Scheduled shutdown; the others can be
+    /// switched on in the control center (pencil) or in Settings. Once chosen it is stored – nothing changes it later.
+    /// </summary>
+    public static void ChooseDefault(bool bluetooth, bool cellular)
+    {
+        var s = DockSettings.Current;
+        if (s.QuickHidden != Unset) return;
+        var shown = new List<string> { "net" };
+        if (bluetooth) shown.Add("bt");
+        if (cellular) shown.Add("cell");
+        shown = shown.Concat(DefaultFill).Take(4).ToList();
+        if (s.QuickTiles.Length == 0) s.QuickTiles = string.Join("|", shown.Concat(Tiles.Select(t => t.Id).Except(shown)));
+        s.QuickHidden = string.Join("|", Tiles.Select(t => t.Id).Except(shown));
+    }
+
+    public static bool IsShown(string id)
+    {
+        if (DockSettings.Current.QuickHidden == Unset) ChooseDefault(App.HasBluetooth, App.HasCellular);   // asked before the radios were found
+        return !Split(DockSettings.Current.QuickHidden).Contains(id);
+    }
 
     public static void SetShown(string id, bool shown)
     {
+        if (DockSettings.Current.QuickHidden == Unset) ChooseDefault(App.HasBluetooth, App.HasCellular);
         var hidden = Split(DockSettings.Current.QuickHidden);
         hidden.Remove(id);
         if (!shown) hidden.Add(id);

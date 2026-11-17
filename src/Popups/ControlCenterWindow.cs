@@ -332,16 +332,16 @@ sealed partial class ControlCenterWindow : PopupWindow
         if (t is not { } tile) return null;
         var circle = new Border
         {
-            Width = 32, Height = 32, CornerRadius = new CornerRadius(16), Background = tile.On ? Res("AccentFillColorDefaultBrush") : Res("ControlAltFillColorSecondaryBrush"),
-            Child = new FontIcon { Glyph = tile.Glyph, FontSize = 14, Foreground = tile.On ? Res("TextOnAccentFillColorPrimaryBrush") : Res("TextFillColorPrimaryBrush") }
+            Width = 40, Height = 40, CornerRadius = new CornerRadius(20), Background = tile.On ? Res("AccentFillColorDefaultBrush") : Res("ControlAltFillColorSecondaryBrush"),
+            Child = new FontIcon { Glyph = tile.Glyph, FontSize = 17, Foreground = tile.On ? Res("TextOnAccentFillColorPrimaryBrush") : Res("TextFillColorPrimaryBrush") }
         };
-        var state = new TextBlock { Text = tile.State, FontSize = 11, Foreground = Res("TextFillColorSecondaryBrush"), TextTrimming = TextTrimming.CharacterEllipsis };
+        var state = new TextBlock { Text = tile.State, FontSize = 12, Margin = new Thickness(0, 1, 0, 0), Foreground = Res("TextFillColorSecondaryBrush"), TextTrimming = TextTrimming.CharacterEllipsis };
         if (id == "awake") _awakeState = state;
         var texts = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Children =
         {
-            new TextBlock { Text = tile.Name, FontSize = 12.5, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, TextWrapping = TextWrapping.WrapWholeWords, MaxLines = 2, TextTrimming = TextTrimming.CharacterEllipsis }, state
+            new TextBlock { Text = tile.Name, FontSize = 14, LineHeight = 17, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, TextWrapping = TextWrapping.WrapWholeWords, MaxLines = 2, TextTrimming = TextTrimming.CharacterEllipsis }, state
         } };
-        var row = new Grid { ColumnSpacing = 10, ColumnDefinitions = { new ColumnDefinition { Width = GridLength.Auto }, new ColumnDefinition(), new ColumnDefinition { Width = GridLength.Auto } } };
+        var row = new Grid { ColumnSpacing = 12, ColumnDefinitions = { new ColumnDefinition { Width = GridLength.Auto }, new ColumnDefinition(), new ColumnDefinition { Width = GridLength.Auto } } };
         row.Children.Add(circle);
         Grid.SetColumn(texts, 1);
         row.Children.Add(texts);
@@ -352,7 +352,7 @@ sealed partial class ControlCenterWindow : PopupWindow
             Grid.SetColumn(arrow, 2);
             row.Children.Add(arrow);
         }
-        var button = new Button { HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Stretch, VerticalAlignment = VerticalAlignment.Stretch, Padding = new Thickness(10, 8, 6, 8), Content = row };
+        var button = new Button { HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Stretch, VerticalAlignment = VerticalAlignment.Stretch, VerticalContentAlignment = VerticalAlignment.Center, Padding = new Thickness(12, 10, 6, 10), Content = row };
         button.Click += (_, _) => tile.Click();
         if (id == "net") button.RightTapped += (_, e) => { e.Handled = true; Open(_wifi != null ? "ms-settings:network-wifi" : "ms-settings:network"); };
         if (id == "bt") button.RightTapped += (_, e) => { e.Handled = true; Open("ms-settings:bluetooth"); };

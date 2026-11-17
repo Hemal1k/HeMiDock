@@ -558,12 +558,12 @@ public partial class DockSettings : INotifyPropertyChanged
     }
     /// <summary>Icon among the status icons while a removable drive is connected (a click: open / eject).</summary>
     public bool ShowRemovable { get => _showRemovable; set => Set(ref _showRemovable, value); }
-    string _quickSections = "", _quickTiles = "", _quickHidden = "";
+    string _quickSections = "", _quickTiles = "", _quickHidden = QuickLayout.Unset;
     /// <summary>Order of the parts of the control center (ids of <see cref="QuickLayout.Sections"/>, separated by |; empty = default).</summary>
     public string QuickSections { get => _quickSections; set => Set(ref _quickSections, value ?? ""); }
     /// <summary>Order of the quick buttons of the control center (ids of <see cref="QuickLayout.Tiles"/>).</summary>
     public string QuickTiles { get => _quickTiles; set => Set(ref _quickTiles, value ?? ""); }
-    /// <summary>Hidden parts and quick buttons of the control center.</summary>
+    /// <summary>Hidden parts and quick buttons of the control center ("*" until the default is chosen by what the PC has).</summary>
     public string QuickHidden { get => _quickHidden; set => Set(ref _quickHidden, value ?? ""); }
 
     bool _dockEditMode;

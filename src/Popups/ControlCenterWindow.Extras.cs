@@ -158,31 +158,34 @@ sealed partial class ControlCenterWindow
         var (title, playing) = BarMedia.Now;
         var media = BarMedia.Details;
         Button B(string glyph, Func<Task> click) { var b = new Button { Style = DockButton, Padding = new Thickness(10, 7, 10, 7), Content = new FontIcon { Glyph = glyph, FontSize = 16 } }; b.Click += async (_, _) => { await click(); await Task.Delay(300); BuildMain(); }; return b; }
-        // the picture of what plays (cover, frame of the video), else the icon of the app; beside it the app, the title and
-        // the artist; the buttons under them
-        const double Pic = 72;
-        var picture = new Border { Width = Pic, Height = Pic, CornerRadius = new CornerRadius(6), Background = Res("ControlFillColorDefaultBrush"), VerticalAlignment = VerticalAlignment.Top };
+        // like the player of a locked phone: a small picture of what plays (cover, frame of the video – else the icon of the
+        // app), beside it the title and the artist, the icon of the app in the corner; the buttons in one row under them
+        const double Pic = 52;
+        var picture = new Border { Width = Pic, Height = Pic, CornerRadius = new CornerRadius(6), Background = Res("ControlFillColorDefaultBrush") };
         if (media?.Picture is { } bytes) _ = ShowPictureAsync(picture, bytes);
-        else if (media?.AppKey is { } k && AppShell.Icon(k) is { } appIcon) picture.Child = new Image { Width = 40, Height = 40, Source = Pictures.ForSize(appIcon, 40) };
-        else picture.Child = new FontIcon { Glyph = "", FontSize = 28, Foreground = Res("TextFillColorSecondaryBrush") };
-        var texts = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Spacing = 2 };
-        if (media?.App is { Length: > 0 } appName)
-        {
-            var source = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, Margin = new Thickness(0, 0, 0, 2) };
-            if (media.AppKey is { } key && AppShell.Icon(key) is { } small) source.Children.Add(new Image { Width = 14, Height = 14, Source = Pictures.ForSize(small, 14), VerticalAlignment = VerticalAlignment.Center });
-            source.Children.Add(new TextBlock { Text = appName, FontSize = 11.5, Foreground = Res("TextFillColorSecondaryBrush"), TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center });
-            texts.Children.Add(source);
-        }
-        texts.Children.Add(new TextBlock { Text = media?.Title ?? title, FontSize = 14, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap, MaxLines = 2, TextTrimming = TextTrimming.CharacterEllipsis });
+        else if (media?.AppKey is { } k && AppShell.Icon(k) is { } appIcon) picture.Child = new Image { Width = 32, Height = 32, Source = Pictures.ForSize(appIcon, 32) };
+        else picture.Child = new FontIcon { Glyph = "", FontSize = 22, Foreground = Res("TextFillColorSecondaryBrush") };
+        var texts = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Spacing = 1 };
+        texts.Children.Add(new TextBlock { Text = media?.Title ?? title, FontSize = 14, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, TextTrimming = TextTrimming.CharacterEllipsis });
         if (media?.Artist is { Length: > 0 } artist)
-            texts.Children.Add(new TextBlock { Text = artist, FontSize = 12, Foreground = Res("TextFillColorSecondaryBrush"), TextTrimming = TextTrimming.CharacterEllipsis });
-        var top = new Grid { ColumnSpacing = 12, ColumnDefinitions = { new ColumnDefinition { Width = GridLength.Auto }, new ColumnDefinition() } };
+            texts.Children.Add(new TextBlock { Text = artist, FontSize = 12.5, Foreground = Res("TextFillColorSecondaryBrush"), TextTrimming = TextTrimming.CharacterEllipsis });
+        else if (media?.App is { Length: > 0 } appName)
+            texts.Children.Add(new TextBlock { Text = appName, FontSize = 12.5, Foreground = Res("TextFillColorSecondaryBrush"), TextTrimming = TextTrimming.CharacterEllipsis });
+        var top = new Grid { ColumnSpacing = 12, ColumnDefinitions = { new ColumnDefinition { Width = GridLength.Auto }, new ColumnDefinition(), new ColumnDefinition { Width = GridLength.Auto } } };
         top.Children.Add(picture);
         Grid.SetColumn(texts, 1);
         top.Children.Add(texts);
-        var row = new StackPanel { Spacing = 6, Children = { top } };
-        var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center, Spacing = 8, Children = { B("", BarMedia.PreviousAsync), B(playing ? "" : "", BarMedia.PlayPauseAsync), B("", BarMedia.NextAsync) } };
-        row.Children.Add(buttons);
+        if (media?.AppKey is { } key && AppShell.Icon(key) is { } small)
+        {
+            var app = new Image { Width = 16, Height = 16, Source = Pictures.ForSize(small, 16), VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, 2, 2, 0) };
+            if (media.App is { Length: > 0 } name) ToolTipService.SetToolTip(app, name);
+            Grid.SetColumn(app, 2);
+            top.Children.Add(app);
+        }
+        var buttons = new Grid { Margin = new Thickness(0, 4, 0, -4), ColumnDefinitions = { new ColumnDefinition(), new ColumnDefinition(), new ColumnDefinition() } };
+        var (prev, play, next) = (B("", BarMedia.PreviousAsync), B(playing ? "" : "", BarMedia.PlayPauseAsync), B("", BarMedia.NextAsync));
+        foreach (var (b, i) in new[] { (prev, 0), (play, 1), (next, 2) }) { b.HorizontalAlignment = HorizontalAlignment.Center; Grid.SetColumn(b, i); buttons.Children.Add(b); }
+        var row = new StackPanel { Spacing = 4, Children = { top, buttons } };
         return Card(row);
     }
 
