@@ -121,18 +121,12 @@ sealed partial class DockWindow
     {
         Desktops.Children.Clear();
         if (!S.ShowDesktops || !RightSide) { Desktops.Visibility = Visibility.Collapsed; return; }
-        var all = VirtualDesktops.All();
-        int current = VirtualDesktops.CurrentIndex(all);
-        for (int i = 0; i < all.Count; i++)
+        BarParts.FillDesktops(Desktops, tip =>
         {
-            int index = i;
-            var b = new Button { Style = (Style)Application.Current.Resources["DockButton"], Padding = new Thickness(8, 4, 8, 4), Content = new TextBlock { Text = (i + 1).ToString(), FontSize = 12, FontWeight = i == current ? Microsoft.UI.Text.FontWeights.Bold : Microsoft.UI.Text.FontWeights.Normal } };
-            if (i == current) b.Background = ThemeBrush.Get("SubtleFillColorSecondaryBrush");
-            ToolTipService.SetToolTip(b, VirtualDesktops.Name(all, i));
-            b.Click += (_, _) => VirtualDesktops.SwitchTo(index);
-            b.PointerReleased += (_, e) => { if (e.GetCurrentPoint(b).Properties.PointerUpdateKind == Microsoft.UI.Input.PointerUpdateKind.MiddleButtonReleased) VirtualDesktops.Close(index); };
-            Desktops.Children.Add(b);
-        }
+            var b = new Button { Style = (Style)Application.Current.Resources["DockButton"], Padding = new Thickness(8, 4, 8, 4) };
+            ToolTipService.SetToolTip(b, tip);
+            return b;
+        });
         var add = new Button { Style = (Style)Application.Current.Resources["DockButton"], Padding = new Thickness(6, 4, 6, 4), Content = new FontIcon { Glyph = "", FontSize = 11 } };
         ToolTipService.SetToolTip(add, L.T("New desktop"));
         add.Click += (_, _) => VirtualDesktops.New();
@@ -192,14 +186,7 @@ sealed partial class DockWindow
         DateText.Text = ClockText.Date(now);
     }
 
-    void UpdateBadge()
-    {
-        int n = NotificationBadge.Count;
-        // its place stays while it is empty (invisible): the dock changed its length whenever the last notification went
-        Badge.Visibility = V(S.ShowNotificationCount);
-        Badge.Opacity = n > 0 ? 1 : 0;
-        BadgeText.Text = n > 99 ? "99+" : n > 0 ? n.ToString() : "0";
-    }
+    void UpdateBadge() => BarParts.ShowBadge(Badge, BadgeText);
 
     /// <summary>The Recycle Bin: its icon empty / full and the number of items in the tooltip.</summary>
     void UpdateBin()

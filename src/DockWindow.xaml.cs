@@ -28,7 +28,6 @@ public sealed partial class DockWindow : Window, IPanelWindow
     readonly IntPtr _hwnd;
     // the windows changed: built again a moment later (many changes come at once); it was 200 ms, the icons followed late
     readonly DispatcherTimer _refresh = new() { Interval = TimeSpan.FromMilliseconds(80) };
-    readonly DispatcherTimer _clock = new() { Interval = TimeSpan.FromSeconds(1) };
     readonly DispatcherTimer _hideTimer = new() { Interval = TimeSpan.FromMilliseconds(150) };
     readonly DispatcherTimer _previewTimer = new() { Interval = TimeSpan.FromMilliseconds(600) };
     readonly DispatcherTimer _previewHide = new() { Interval = TimeSpan.FromMilliseconds(400) };
@@ -99,8 +98,9 @@ public sealed partial class DockWindow : Window, IPanelWindow
 
         if (ShellHost.Running) _appBar = new AppBar(_hwnd); // as the taskbar it keeps maximized windows out of its place
         _refresh.Tick += (_, _) => { _refresh.Stop(); Rebuild(); };
-        _clock.Tick += (_, _) => Tick();
-        _clock.Start();
+        // once a second with the other bars (one tick for all, the clocks turn together)
+        Action second = Tick;
+        SecondTick.Tick += second; _unsubscribe.Add(() => SecondTick.Tick -= second);
         _hideTimer.Tick += (_, _) => AutoHideTick();
         _previewTimer.Tick += (_, _) => { _previewTimer.Stop(); ShowPreview(); };
         _previewHide.Tick += (_, _) =>
@@ -139,7 +139,7 @@ public sealed partial class DockWindow : Window, IPanelWindow
             _closed = true;
             Microsoft.UI.Xaml.Media.CompositionTarget.Rendering -= OnMoveFrame;
             foreach (var off in _unsubscribe) off();
-            _clock.Stop(); _hideTimer.Stop(); _refresh.Stop();
+            _hideTimer.Stop(); _refresh.Stop();
             _appBar?.Dispose();
             if (_main) WindowEvents.Stop();
         };

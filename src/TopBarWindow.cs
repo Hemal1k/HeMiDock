@@ -32,7 +32,6 @@ sealed class TopBarWindow : Window, IPanelWindow
     readonly List<(string Id, FrameworkElement El)> _parts = new();
     readonly List<Action> _unsubscribe = new();
     readonly DispatcherTimer _fast = new() { Interval = TimeSpan.FromMilliseconds(150) };
-    readonly DispatcherTimer _slow = new() { Interval = TimeSpan.FromSeconds(1) };
     readonly StatusParts _status = new();
     readonly TextBlock _appName = new() { FontSize = 13, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis, MaxWidth = 420 };
     readonly TextBlock _time = new() { FontSize = 13.5, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center };
@@ -218,14 +217,17 @@ sealed class TopBarWindow : Window, IPanelWindow
         BluetoothWatch.Start();
         NotificationBadge.Watch(true);
         VirtualDesktops.Watch();
+        // the name of the active app when another window comes to the front (it was asked for 7 times a second)
+        WinEvents.Handler foreground = (_, _, _, _) => UpdateAppName();
+        WinEvents.On(WinEvents.Foreground, foreground); _unsubscribe.Add(() => WinEvents.Off(WinEvents.Foreground, foreground));
+        // once a second with the other bars (one tick for all, the clocks turn together); the quick tick only when needed
+        Action second = SlowTick;
+        SecondTick.Tick += second; _unsubscribe.Add(() => SecondTick.Tick -= second);
         _fast.Tick += (_, _) => FastTick();
-        _slow.Tick += (_, _) => SlowTick();
-        _fast.Start();
-        _slow.Start();
         Closed += (_, _) =>
         {
             _closed = true;
-            _fast.Stop(); _slow.Stop();
+            _fast.Stop();
             foreach (var off in _unsubscribe) off();
             _appBar?.Dispose();
         };
@@ -279,6 +281,16 @@ sealed class TopBarWindow : Window, IPanelWindow
     void Apply()
     {
         if (_closed) return;
+        // the quick tick (150 ms) only for hiding the bar by the mouse and for Caps / Num Lock; it ran always before
+        bool quick = S.TopBarAutoHide || S.ShowCapsLock || S.ShowNumLock;
+        if (quick) { if (!_fast.IsEnabled) _fast.Start(); }
+        else
+        {
+            _fast.Stop();
+            if (_hidden) { _hidden = false; ApplyVisible(); }
+            UpdateKeys();
+        }
+        UpdateAppName();
         double item = Math.Max(18, S.TopBarHeight - 6);
         _system.Visibility = V(S.TopBarSystemMenu);
         _app.Visibility = V(S.TopBarAppName);
@@ -440,18 +452,7 @@ sealed class TopBarWindow : Window, IPanelWindow
         _desks.Children.Clear();
         _desks.Visibility = V(S.ShowDesktops);
         if (!S.ShowDesktops) return;
-        var all = VirtualDesktops.All();
-        int current = VirtualDesktops.CurrentIndex(all);
-        for (int i = 0; i < all.Count; i++)
-        {
-            int index = i;
-            var b = BarButton(null, VirtualDesktops.Name(all, i));
-            b.Content = new TextBlock { Text = (i + 1).ToString(), FontSize = 12, FontWeight = i == current ? Microsoft.UI.Text.FontWeights.Bold : Microsoft.UI.Text.FontWeights.Normal };
-            if (i == current) b.Background = ThemeBrush.Get("SubtleFillColorSecondaryBrush");
-            b.Click += (_, _) => VirtualDesktops.SwitchTo(index);
-            b.PointerReleased += (_, e) => { if (e.GetCurrentPoint(b).Properties.PointerUpdateKind == Microsoft.UI.Input.PointerUpdateKind.MiddleButtonReleased) VirtualDesktops.Close(index); };
-            _desks.Children.Add(b);
-        }
+        BarParts.FillDesktops(_desks, tip => BarButton(null, tip));
         var add = BarButton("", L.T("New desktop"), 11);
         add.Click += (_, _) => VirtualDesktops.New();
         _desks.Children.Add(add);
@@ -464,14 +465,7 @@ sealed class TopBarWindow : Window, IPanelWindow
         _date.Text = ClockText.Date(now, topBar: true);                  // on one line with the time, like on macOS
     }
 
-    void UpdateBadge()
-    {
-        int n = NotificationBadge.Count;
-        // its place stays while it is empty (invisible): the bar changed its parts' places whenever the last notification went
-        _badge.Visibility = V(S.ShowNotificationCount);
-        _badge.Opacity = n > 0 ? 1 : 0;
-        _badgeText.Text = n > 99 ? "99+" : n > 0 ? n.ToString() : "0";
-    }
+    void UpdateBadge() => BarParts.ShowBadge(_badge, _badgeText);
 
     // ───────────────────────── the active app ─────────────────────────
 
@@ -602,7 +596,6 @@ sealed class TopBarWindow : Window, IPanelWindow
 
     void FastTick()
     {
-        UpdateAppName();
         UpdateKeys();
         if (!S.TopBarAutoHide) { if (_hidden) { _hidden = false; ApplyVisible(); } return; }
         if (!Native.GetCursorPos(out var c)) return;
