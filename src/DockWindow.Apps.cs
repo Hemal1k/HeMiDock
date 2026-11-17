@@ -30,6 +30,16 @@ sealed partial class DockWindow
         var windows = ShellHost.Running ? ShellHost.TaskWindows() : TaskWindows.List();
         _pins = DockState.Load();
         _entries = DockModel.Build(_pins, windows);
+        // the mark "starting" ends as soon as the app has its window: it lasted 8 s, and an app closed within them kept its
+        // running mark until they ran out (File Explorer, Brave)
+        if (_launching.Count > 0)
+            foreach (var e in _entries)
+                if (e.Windows.Count > 0)
+                {
+                    if (e.ExePath != null) _launching.Remove(e.ExePath);
+                    if (e.IconPath != null) _launching.Remove(e.IconPath);
+                    if (e.Pin?.Path != null) _launching.Remove(e.Pin.Path);
+                }
         string shown = string.Join("|", _entries.Select(e => e.IsGap ? (e.Pin.Line ? "L" : "S") : $"{e.IconPath}:{e.Pin?.IconPath}:{e.Name}:{e.Windows.Count}:{e.Windows.Any(w => w.Active)}:{e.Windows.Any(w => w.Flashing)}:{e.Windows.Select(w => w.Progress).DefaultIfEmpty(-1).Max():0.00}:{e.Windows.Any(w => w.Overlay != null)}:{_launching.Contains(e.ExePath ?? "")}"))
             + $"|{S.ShowRunningIndicator}{S.ShowAppNames}{S.DockEditMode}{UnreadMail.HasMail}{_layoutShown}";
         if (shown != _shown)
