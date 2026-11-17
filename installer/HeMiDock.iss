@@ -87,7 +87,7 @@ Filename: "{app}\HeMiDock.exe"; Parameters: "--repair"; Flags: runasoriginaluser
 ; after an interactive installation: offered; after an update (quiet): the dock starts again by itself
 ; (as the user who started the installer – never as administrator after an installation for all users)
 Filename: "{app}\HeMiDock.exe"; Description: "{cm:LaunchAfter}"; Flags: nowait postinstall skipifsilent runasoriginaluser
-Filename: "{app}\HeMiDock.exe"; Parameters: "--after-update"; Flags: nowait runasoriginaluser; Check: WizardSilent
+Filename: "{app}\HeMiDock.exe"; Parameters: "--after-update"; Flags: nowait runasoriginaluser; Check: DockWasRunning
 
 [UninstallRun]
 Filename: "{app}\HeMiDock.exe"; Parameters: "--uninstall"; Flags: waituntilterminated; RunOnceId: "HeMiDockUninstall"
@@ -111,6 +111,15 @@ Root: HKCU; Subkey: "Software\HeMi"; Flags: uninsdeletekeyifempty dontcreatekey
 // new folder ("--repair" points the File Explorer items and the start with Windows to it) and the old folder is deleted.
 var
   OldFolder: String;
+  // the dock ran when the installation began (an update): only then it starts again after a quiet installation – a new
+  // quiet installation (winget) does not start it; /UPDATE (the updater of the dock, HeMi Launcher) always does: the dock
+  // ends before the installer gets to look
+  WasRunning: Boolean;
+
+function DockWasRunning: Boolean;
+begin
+  Result := WizardSilent and (WasRunning or (Pos('/UPDATE', Uppercase(GetCmdTail)) > 0));
+end;
 
 function FindOldFolder: String;
 begin
@@ -209,6 +218,7 @@ var
   Code: Integer;
 begin
   Result := '';
+  WasRunning := CheckForMutexes('HeMiDock_SingleInstance');
   StopOld;
   if FileExists(ExpandConstant('{app}\HeMiDock.exe')) then
   begin

@@ -542,8 +542,10 @@ namespace ManagedShell.WindowsTray
                             }
                         }
 
-                        if ((NIF.STATE & nicData.uFlags) != 0)
-                            trayIcon.IsHidden = nicData.dwState == 1;
+                        // hidden only as Windows takes it: the state counts where its mask says so (NIS_HIDDEN = 1); an app
+                        // sending a state without the mask (or with NIS_SHAREDICON) stayed hidden here, but not in Explorer
+                        if ((NIF.STATE & nicData.uFlags) != 0 && (nicData.dwStateMask & 1) != 0)
+                            trayIcon.IsHidden = (nicData.dwState & 1) != 0;
 
                         if ((NIF.TIP & nicData.uFlags) != 0 && !string.IsNullOrEmpty(nicData.szTip))
                         {

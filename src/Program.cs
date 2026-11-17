@@ -24,6 +24,34 @@ static class Program
             Environment.ExitCode = LogicCheck.Run(args.Length >= 2 ? args[1] : null);
             return;
         }
+        // what the installer and uninstaller start runs here too, before WinUI: on a PC without the Windows App Runtime (a
+        // quiet installation that could not add it – the test PCs of winget) Windows asked about the runtime with a window
+        // --repair: the start at sign-in and "Pin to Start" of Explorer point to this HeMiDock.exe
+        if (args.Contains("--repair"))
+        {
+            try
+            {
+                L.Apply(DockSettings.Current.Language);
+                if (Autostart.IsOn) Autostart.IsOn = true;
+                ExplorerVerb.Apply(DockSettings.Current.ReplaceStartMenu);
+            }
+            catch (Exception ex) { Log.Write("Repair", ex); }
+            return;
+        }
+        // --exit ends the running dock properly; --uninstall also takes away what it put into Windows (the settings stay)
+        bool uninstall = args.Contains("--uninstall");
+        if (uninstall || args.Contains("--exit"))
+        {
+            if (EventWaitHandle.TryOpenExisting("HeMiDock_Exit", out var running)) running.Set();
+            if (uninstall)
+            {
+                try { Autostart.IsOn = false; } catch (Exception ex) { Log.Write("Uninstall", ex); }
+                try { ExplorerVerb.Apply(false); } catch (Exception ex) { Log.Write("Uninstall", ex); }
+                // the dock gives the taskbar back before the uninstaller removes its files (at most 5 s)
+                for (int i = 0; i < 50 && System.Diagnostics.Process.GetProcessesByName("HeMiDock").Any(p => p.Id != Environment.ProcessId); i++) Thread.Sleep(100);
+            }
+            return;
+        }
         if (args.Length >= 2 && args[0] == "--watchdog" && int.TryParse(args[1], out int pid))
         {
             Watchdog.Run(pid);
