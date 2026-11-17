@@ -332,7 +332,7 @@ static class SearchEngine
         return null;
     }
 
-    static bool TryCalc(string t, out string result)
+    internal static bool TryCalc(string t, out string result)
     {
         result = null;
         if (t.Length < 3 || !Regex.IsMatch(t, @"^[\d\s\.,\+\-\*/\(\)%x×÷]+$")) return false;

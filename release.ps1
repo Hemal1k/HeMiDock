@@ -34,6 +34,13 @@ if ($LASTEXITCODE) { throw 'The installer could not be made.' }
 foreach ($rid in 'win-x64', 'win-arm64') {
     dotnet publish src\HeMiDock.csproj -c Release -r $rid -p:Portable=true -o "$work\portable-$rid" -v q -nologo
     if ($LASTEXITCODE) { throw "The portable build failed ($rid)." }
+    # the checks of the logic (HeMiDock.exe --check) on the trimmed x64 build people download: a failed one stops the release
+    if ($rid -eq 'win-x64') {
+        $report = Join-Path $work 'check.txt'
+        $check = Start-Process "$work\portable-$rid\HeMiDock.exe" -ArgumentList '--check', "`"$report`"" -PassThru -Wait
+        if (Test-Path $report) { Get-Content $report -Encoding UTF8 | ForEach-Object { Write-Host "  $_" } }
+        if ($check.ExitCode -ne 0) { throw "The check of the logic failed ($($check.ExitCode) of the checks)." }
+    }
     $zip = if ($rid -eq 'win-x64') { "$dist\HeMiDock-Portable.zip" } else { "$dist\HeMiDock-Portable-arm64.zip" }
     Compress-Archive -Path "$work\portable-$rid\*" -DestinationPath $zip
 }

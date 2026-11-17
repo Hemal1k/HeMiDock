@@ -17,6 +17,13 @@ static class Program
         foreach (var name in Environment.GetEnvironmentVariables().Keys.OfType<string>().ToList())
             if (name.StartsWith("VSCODE_", StringComparison.OrdinalIgnoreCase) || name.StartsWith("ELECTRON_", StringComparison.OrdinalIgnoreCase))
                 Environment.SetEnvironmentVariable(name, null);
+        // --check [file]: the checks of the logic without a window (the build server runs them), nothing of WinUI loaded
+        // (--selftest is the other one, of the debug build: the export and import of the settings in the running app)
+        if (args.Length >= 1 && args[0] == "--check")
+        {
+            Environment.ExitCode = LogicCheck.Run(args.Length >= 2 ? args[1] : null);
+            return;
+        }
         if (args.Length >= 2 && args[0] == "--watchdog" && int.TryParse(args[1], out int pid))
         {
             Watchdog.Run(pid);

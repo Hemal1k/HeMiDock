@@ -48,7 +48,7 @@ static class Hotkeys
     /// </summary>
     public static bool AllowedAlone(int vk) => vk is >= 0x70 and <= 0x87 or 0x13 or 0x91 or 0x2C or 0x5D or >= 0xA6 and <= 0xB7;
 
-    static Dictionary<string, Combo> Parse(string stored)
+    internal static Dictionary<string, Combo> Parse(string stored)
     {
         var map = new Dictionary<string, Combo>();
         foreach (var part in (stored ?? "").Split('|', StringSplitOptions.RemoveEmptyEntries))
