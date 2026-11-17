@@ -38,7 +38,7 @@ sealed partial class ControlCenterWindow
 
     void BuildAwake(bool custom)
     {
-        ShowPage("awake", "Keep awake");
+        ShowPage("awake", "Scheduled shutdown");
         PageCard().Children.Add(PageRow("", KeepAwake.IsOn ? "Sleep is blocked – allow it" : "Block sleep", KeepAwake.IsOn, () => { KeepAwake.Set(!KeepAwake.IsOn); BuildAwake(false); }));
         var card = PageCard(KeepAwake.ShutdownAt is { } at ? L.T("Shut down at {0}", at.ToString("t")) : L.T("Shut down the PC in"));
         if (KeepAwake.ShutdownAt != null)

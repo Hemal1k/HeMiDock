@@ -20,7 +20,7 @@ static class QuickLayout
     public static readonly (string Id, string Name)[] Tiles =
     {
         ("net", "Network"), ("cell", "Mobile data"), ("dnd", "Do not disturb"), ("bt", "Bluetooth"), ("airplane", "Airplane mode"), ("night", "Night light"), ("cast", "Cast"), ("access", "Accessibility"),
-        ("vpn", "VPN"), ("display", "Monitors"), ("awake", "Keep awake")
+        ("vpn", "VPN"), ("display", "Monitors"), ("awake", "Scheduled shutdown")
     };
 
     static List<string> Split(string s) => (s ?? "").Split('|', StringSplitOptions.RemoveEmptyEntries).ToList();

@@ -95,7 +95,7 @@ sealed partial class ControlCenterWindow : PopupWindow
         OpenRequested();
     }
 
-    /// <summary>A widget of the top bar opens the control center at its own page (Monitors, Keep awake, Cast).</summary>
+    /// <summary>A widget of the top bar opens the control center at its own page (Monitors, Scheduled shutdown, Cast).</summary>
     internal static string OpenWith;
 
     void OpenRequested()
@@ -195,6 +195,12 @@ sealed partial class ControlCenterWindow : PopupWindow
             tiles.Children.Add(item);
             n++;
         }
+        // every tile as high as the highest one (a long name goes on two lines – the others grow with it, all alike)
+        tiles.Loaded += (_, _) =>
+        {
+            double high = tiles.Children.OfType<FrameworkElement>().Select(c => c.ActualHeight).DefaultIfEmpty(0).Max();
+            if (high > 0) foreach (var r in tiles.RowDefinitions) r.Height = new GridLength(high);
+        };
 
         FrameworkElement Part(FrameworkElement card, string id) => _editing ? Editable(card, id, tile: false) : card;
         foreach (var id in QuickLayout.SectionOrder.Where(id => (QuickLayout.IsShown(id) || _editing) && !QuickLayout.OnBar(id)))
@@ -320,7 +326,7 @@ sealed partial class ControlCenterWindow : PopupWindow
             "access" => ("", L.T("Accessibility"), L.T("Settings"), false, () => Open("ms-settings:easeofaccess"), null),
             "vpn" => ("", "VPN", Vpn.Active() ?? (Vpn.Profiles().Count > 0 ? L.T("Not connected") : L.T("Settings")), Vpn.Active() != null, () => { if (Vpn.Active() == null && Vpn.Profiles().Count == 0) { CloseNow(); Vpn.Toggle(); } else { Vpn.Toggle(); BuildMain(); } }, null),
             "display" => ("", L.T("Monitors"), L.T("Settings"), false, ShowMonitors, null),
-            "awake" => ("", L.T("Keep awake"), AwakeText(), KeepAwake.IsOn || KeepAwake.ShutdownAt != null, ShowAwake, null),
+            "awake" => ("", L.T("Scheduled shutdown"), AwakeText(), KeepAwake.IsOn || KeepAwake.ShutdownAt != null, ShowAwake, null),
             _ => null
         };
         if (t is not { } tile) return null;
@@ -333,7 +339,7 @@ sealed partial class ControlCenterWindow : PopupWindow
         if (id == "awake") _awakeState = state;
         var texts = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Children =
         {
-            new TextBlock { Text = tile.Name, FontSize = 12.5, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, TextTrimming = TextTrimming.CharacterEllipsis }, state
+            new TextBlock { Text = tile.Name, FontSize = 12.5, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, TextWrapping = TextWrapping.WrapWholeWords, MaxLines = 2, TextTrimming = TextTrimming.CharacterEllipsis }, state
         } };
         var row = new Grid { ColumnSpacing = 10, ColumnDefinitions = { new ColumnDefinition { Width = GridLength.Auto }, new ColumnDefinition(), new ColumnDefinition { Width = GridLength.Auto } } };
         row.Children.Add(circle);
@@ -346,7 +352,7 @@ sealed partial class ControlCenterWindow : PopupWindow
             Grid.SetColumn(arrow, 2);
             row.Children.Add(arrow);
         }
-        var button = new Button { HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Stretch, Padding = new Thickness(10, 8, 6, 8), Content = row };
+        var button = new Button { HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Stretch, VerticalAlignment = VerticalAlignment.Stretch, Padding = new Thickness(10, 8, 6, 8), Content = row };
         button.Click += (_, _) => tile.Click();
         if (id == "net") button.RightTapped += (_, e) => { e.Handled = true; Open(_wifi != null ? "ms-settings:network-wifi" : "ms-settings:network"); };
         if (id == "bt") button.RightTapped += (_, e) => { e.Handled = true; Open("ms-settings:bluetooth"); };

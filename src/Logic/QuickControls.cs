@@ -72,7 +72,7 @@ static class QuickControls
             Get = () => Value(() => Bool(Dnd.IsOn)), Set = v => Do(() => Dnd.Set(v > 0.5)) };
         yield return new() { Id = "dark", Name = "Dark mode", Glyph = "", Type = ControlType.Toggle, Keywords = "dark mode|dark|theme|light|tmavy rezim|tmavy|svetly|motiv",
             Get = () => Value(() => Bool(!ThemeSchedule.WindowsLight)), Set = v => Do(() => ThemeSchedule.SetWindows(v < 0.5)) };
-        yield return new() { Id = "awake", Name = "Keep awake", Glyph = "", Type = ControlType.Toggle, Keywords = "keep awake|awake|caffeine|no sleep|nespat|udrzet vzhuru|vzhuru",
+        yield return new() { Id = "awake", Name = "Scheduled shutdown", Glyph = "", Type = ControlType.Toggle, Keywords = "scheduled shutdown|shutdown timer|planovane vypnuti|vypnuti|keep awake|awake|caffeine|no sleep|nespat|udrzet vzhuru|vzhuru",
             Get = () => Value(() => Bool(KeepAwake.IsOn)), Set = v => Do(() => KeepAwake.Set(v > 0.5)) };
         yield return new() { Id = "mic", Name = "Mute the microphone", Glyph = "", Type = ControlType.Toggle, Keywords = "microphone|mic|mute|mikrofon|ztlumit",
             Get = () => Value(() => Bool(AudioControl.MicNow()?.Mute)), Set = v => Do(() => { if ((AudioControl.MicNow()?.Mute ?? false) != v > 0.5) AudioControl.ToggleMicMute(); }) };

@@ -339,7 +339,7 @@ static class L
         ["Duplicate"] = "Duplikovat",
         ["Extend"] = "Rozšířit",
         ["Second screen only"] = "Pouze druhá obrazovka",
-        ["Keep awake"] = "Nevypínat",
+        ["Scheduled shutdown"] = "Plánované vypnutí",
         ["Sleep is blocked – allow it"] = "Spánek je zablokován – povolit",
         ["Block sleep"] = "Zabránit spánku",
         ["Shut down at {0}"] = "Vypnutí v {0}",

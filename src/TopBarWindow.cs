@@ -151,7 +151,7 @@ sealed class TopBarWindow : Window, IPanelWindow
             ("system", _system), ("app", _app), ("desks", _desks), ("monitor", _monitor), ("media", _media), ("tray", _trayPart), ("keys", _keysPart), ("lang", _lang),
             ("search", _search), ("taskview", _taskView), ("sysbin", _bin), ("downloads", _downloads), ("status", _status.Button), ("clock", _clock), ("desktop", _desktop)
         });
-        foreach (var (id, glyph, name) in new[] { ("night", "", "Night light"), ("cast", "", "Cast"), ("access", "", "Accessibility"), ("display", "", "Monitors"), ("awake", "", "Keep awake"), ("brightness", "", "Display"), ("power", "", "Power mode") })
+        foreach (var (id, glyph, name) in new[] { ("night", "", "Night light"), ("cast", "", "Cast"), ("access", "", "Accessibility"), ("display", "", "Monitors"), ("awake", "", "Scheduled shutdown"), ("brightness", "", "Display"), ("power", "", "Power mode") })
         {
             var widget = BarButton(glyph, L.T(name));
             widget.Click += (_, _) => { ControlCenterWindow.OpenWith = id; App.Anchor = this; PopupWindow.Toggle("control", () => new ControlCenterWindow()); };
