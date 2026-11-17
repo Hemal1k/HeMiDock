@@ -185,8 +185,59 @@ sealed partial class ControlCenterWindow
         var buttons = new Grid { Margin = new Thickness(0, 4, 0, -4), ColumnDefinitions = { new ColumnDefinition(), new ColumnDefinition(), new ColumnDefinition() } };
         var (prev, play, next) = (B("", BarMedia.PreviousAsync), B(playing ? "" : "", BarMedia.PlayPauseAsync), B("", BarMedia.NextAsync));
         foreach (var (b, i) in new[] { (prev, 0), (play, 1), (next, 2) }) { b.HorizontalAlignment = HorizontalAlignment.Center; Grid.SetColumn(b, i); buttons.Children.Add(b); }
-        var row = new StackPanel { Spacing = 4, Children = { top, buttons } };
+        var row = new StackPanel { Spacing = 4, Children = { top, TimeBar(), buttons } };
         return Card(row);
+    }
+
+    /// <summary>
+    /// The time of what plays: a slider to move it (when the app lets it), the time gone under its left end and the time
+    /// left under its right end; it goes on every second while the control center is open. Hidden while the app tells no time.
+    /// </summary>
+    static FrameworkElement TimeBar()
+    {
+        var slider = new Slider { Minimum = 0, Maximum = 1, StepFrequency = 1, IsThumbToolTipEnabled = false, Margin = new Thickness(0, 0, 0, -8) };
+        TextBlock Time(HorizontalAlignment side) => new() { FontSize = 11, Foreground = Res("TextFillColorSecondaryBrush"), HorizontalAlignment = side };
+        var (gone, left) = (Time(HorizontalAlignment.Left), Time(HorizontalAlignment.Right));
+        var times = new Grid { Children = { gone, left } };
+        var bar = new StackPanel { Spacing = 0, Visibility = Visibility.Collapsed, Children = { slider, times } };
+        bool setting = false;
+        DateTime touched = default;
+        DispatcherTimer seek = null;
+        static string Text(TimeSpan t) => t.TotalHours >= 1 ? t.ToString(@"h\:mm\:ss") : t.ToString(@"m\:ss");
+
+        void Show(TimeSpan position, TimeSpan length)
+        {
+            gone.Text = Text(position);
+            left.Text = "-" + Text(length - position);
+        }
+        void Update()
+        {
+            if (BarMedia.Timeline() is not { } t) { bar.Visibility = Visibility.Collapsed; return; }
+            bar.Visibility = Visibility.Visible;
+            slider.IsEnabled = t.CanSeek;
+            if ((DateTime.Now - touched).TotalSeconds < 1.5) return;   // the user moves it: not under their hand
+            setting = true;
+            slider.Maximum = Math.Max(1, Math.Round(t.Length.TotalSeconds));
+            slider.Value = Math.Min(slider.Maximum, Math.Round(t.Position.TotalSeconds));
+            setting = false;
+            Show(t.Position, t.Length);
+        }
+        // moved by the user (drag, click, keys): the times follow at once, the app gets the place when the hand stops
+        slider.ValueChanged += (_, e) =>
+        {
+            if (setting) return;
+            touched = DateTime.Now;
+            Show(TimeSpan.FromSeconds(e.NewValue), TimeSpan.FromSeconds(slider.Maximum));
+            seek ??= new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
+            seek.Tick -= Seek; seek.Tick += Seek;
+            seek.Start();
+        };
+        void Seek(object s, object e) { seek.Stop(); _ = BarMedia.SeekAsync(TimeSpan.FromSeconds(slider.Value)); }
+        void Tick() => Update();
+        bar.Loaded += (_, _) => { SecondTick.Tick += Tick; Update(); };
+        bar.Unloaded += (_, _) => { SecondTick.Tick -= Tick; seek?.Stop(); };
+        Update();
+        return bar;
     }
 
     /// <summary>The picture of the media from its bytes (a cover is a JPEG or PNG), filling the rounded place.</summary>

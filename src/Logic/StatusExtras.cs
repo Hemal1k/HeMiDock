@@ -278,6 +278,44 @@ static class BarMedia
     public static async Task PlayPauseAsync() { try { if (_session != null) await _session.TryTogglePlayPauseAsync(); } catch { } }
     public static async Task NextAsync() { try { if (_session != null) await _session.TrySkipNextAsync(); } catch { } }
     public static async Task PreviousAsync() { try { if (_session != null) await _session.TrySkipPreviousAsync(); } catch { } }
+
+    /// <summary>
+    /// Where the media is and how long it is (null when the app does not tell: a live stream, some players); while it plays,
+    /// the position goes on from the moment the app told it last. CanSeek: the app lets others move it.
+    /// </summary>
+    public static (TimeSpan Position, TimeSpan Length, bool CanSeek)? Timeline()
+    {
+        try
+        {
+            if (_session == null) return null;
+            var t = _session.GetTimelineProperties();
+            var length = t.EndTime - t.StartTime;
+            if (length < TimeSpan.FromSeconds(1)) return null;
+            var position = t.Position - t.StartTime;
+            var info = _session.GetPlaybackInfo();
+            if (info?.PlaybackStatus == Windows.Media.Control.GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing && t.LastUpdatedTime.Year > 2000)
+            {
+                var since = DateTimeOffset.Now - t.LastUpdatedTime;
+                if (since > TimeSpan.Zero) position += since * (info.PlaybackRate ?? 1);
+            }
+            if (position < TimeSpan.Zero) position = TimeSpan.Zero;
+            if (position > length) position = length;
+            return (position, length, info?.Controls?.IsPlaybackPositionEnabled == true);
+        }
+        catch { return null; }
+    }
+
+    /// <summary>Moves the media to a place (from its start).</summary>
+    public static async Task SeekAsync(TimeSpan to)
+    {
+        try
+        {
+            if (_session == null) return;
+            var t = _session.GetTimelineProperties();
+            await _session.TryChangePlaybackPositionAsync((t.StartTime + to).Ticks);
+        }
+        catch { }
+    }
 }
 
 /// <summary>
