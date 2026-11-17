@@ -13,11 +13,28 @@ static class AppRules
 {
     public const string Maximized = "max";
     [DllImport("user32.dll")] static extern IntPtr GetWindow(IntPtr h, uint cmd);
+    [DllImport("user32.dll")] static extern bool IsZoomed(IntPtr h);
 
     const int WS_CAPTION = 0xC00000;
     static readonly WinEvents.Handler OnShowEvent = (_, hwnd, obj, child) => OnShow(hwnd, obj, child);
+    static readonly WinEvents.Handler OnCreateEvent = (_, hwnd, obj, child) => OnCreate(hwnd, obj, child);
     static bool _on;
     static readonly HashSet<IntPtr> Seen = new();
+    /// <summary>The program of a process (a cache: windows are created often, the process is asked once).</summary>
+    static readonly Dictionary<uint, string> ExeOfProcess = new();
+
+    static string ExeOf(IntPtr hwnd)
+    {
+        Native.GetWindowThreadProcessId(hwnd, out uint pid);
+        if (ExeOfProcess.TryGetValue(pid, out var exe)) return exe;
+        if (ExeOfProcess.Count > 500) ExeOfProcess.Clear();
+        try { using var p = Process.GetProcessById((int)pid); exe = p.ProcessName + ".exe"; }
+        catch { exe = null; }
+        return ExeOfProcess[pid] = exe;
+    }
+
+    /// <summary>A main window: with a title bar, not owned by another window.</summary>
+    static bool IsMain(IntPtr hwnd) => (Native.GetWindowLong(hwnd, -16) & WS_CAPTION) == WS_CAPTION && GetWindow(hwnd, 4) == IntPtr.Zero;
 
     public static Dictionary<string, string> All()
     {
@@ -39,8 +56,31 @@ static class AppRules
         bool on = DockSettings.Current.AppRules.Length > 0;
         if (on == _on) return;
         _on = on;
-        if (on) WinEvents.On(WinEvents.Show, OnShowEvent);
-        else { WinEvents.Off(WinEvents.Show, OnShowEvent); Seen.Clear(); }
+        if (on) { WinEvents.On(WinEvents.Create, OnCreateEvent); WinEvents.On(WinEvents.Show, OnShowEvent); }
+        else
+        {
+            WinEvents.Off(WinEvents.Create, OnCreateEvent);
+            WinEvents.Off(WinEvents.Show, OnShowEvent);
+            Seen.Clear();
+        }
+    }
+
+    // The window opens right at its place, with the one opening animation of Windows: put into its zone already when it is
+    // created (not shown yet), and again when it is shown – the event comes in time for the first frame Windows draws. Then
+    // checked twice more, in case the app moves it itself a moment after it shows it. (It was hidden and faded in once – but
+    // Windows draws its opening animation also over a transparent window, so it looked like the window opened twice.)
+
+    /// <summary>A window just created, not shown yet: into its zone at once (a maximized one only when shown – that shows it).</summary>
+    static void OnCreate(IntPtr hwnd, int obj, int child)
+    {
+        if (obj != 0 || child != 0 || hwnd == IntPtr.Zero || Seen.Contains(hwnd)) return;
+        try
+        {
+            if (Native.IsWindowVisible(hwnd) || !IsMain(hwnd)) return;
+            if (ExeOf(hwnd) is not { } exe || !All().TryGetValue(exe, out var place) || place == Maximized) return;
+            Place(hwnd, place);
+        }
+        catch { }
     }
 
     static void OnShow(IntPtr hwnd, int obj, int child)
@@ -48,78 +88,27 @@ static class AppRules
         if (obj != 0 || child != 0 || hwnd == IntPtr.Zero || Seen.Contains(hwnd)) return;
         try
         {
-            if ((Native.GetWindowLong(hwnd, -16) & WS_CAPTION) != WS_CAPTION || GetWindow(hwnd, 4) != IntPtr.Zero) return;   // only main windows
+            if (!IsMain(hwnd)) return;
             if (Seen.Count > 2000) Seen.Clear();
             Seen.Add(hwnd);
-            Native.GetWindowThreadProcessId(hwnd, out uint pid);
-            using var p = Process.GetProcessById((int)pid);
-            if (!All().TryGetValue(p.ProcessName + ".exe", out var place)) return;
-            // The window is seen only at its place: it is made invisible at once and placed, placed again after the app has put it
-            // where it wanted (some do that a moment after they show it), and only then made visible – before, it was seen
-            // opening at its own place and jumping to the rule 400 ms later.
-            var hidden = Invisible(hwnd);
-            Place(hwnd, place);
+            if (ExeOf(hwnd) is not { } exe || !All().TryGetValue(exe, out var place)) return;
+            if (!AtPlace(hwnd, place)) Place(hwnd, place);
             int ticks = 0;
             var later = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(120) };
             later.Tick += (_, _) =>
             {
                 ticks++;
-                if (ticks is 1 or 3) Place(hwnd, place);                // at 120 ms and at 360 ms
-                if (ticks < 3) return;
-                later.Stop();
-                Visible(hwnd, hidden);
+                if (ticks is 1 or 3 && Win32.IsWindow(hwnd) && !AtPlace(hwnd, place)) Place(hwnd, place);   // at 120 ms and at 360 ms
+                if (ticks >= 3) later.Stop();
             };
             later.Start();
         }
         catch { }                                                      // a window of an app that already ended, or of a higher privilege
     }
 
-    [DllImport("user32.dll")] static extern bool SetLayeredWindowAttributes(IntPtr h, uint key, byte alpha, uint flags);
-    [DllImport("user32.dll")] static extern bool GetLayeredWindowAttributes(IntPtr h, out uint key, out byte alpha, out uint flags);
-    [DllImport("user32.dll")] static extern bool RedrawWindow(IntPtr h, IntPtr rect, IntPtr region, uint flags);
-    [DllImport("user32.dll", SetLastError = true)] static extern int SetWindowLong(IntPtr h, int index, int value);
-    const int GWL_EXSTYLE = -20, WS_EX_LAYERED = 0x80000;
-    const uint LWA_ALPHA = 2;
-
-    /// <summary>What a window was like before it was made invisible: null when it could not be (a window of an administrator app,
-    /// a window that draws its own transparency) – it is then placed without it, as before.</summary>
-    sealed record Hidden(bool WasLayered, byte Alpha, uint Flags, uint Key);
-
-    static Hidden Invisible(IntPtr hwnd)
-    {
-        try
-        {
-            int ex = Native.GetWindowLong(hwnd, GWL_EXSTYLE);
-            bool layered = (ex & WS_EX_LAYERED) != 0;
-            byte alpha = 255; uint flags = 0, key = 0;
-            if (layered && !GetLayeredWindowAttributes(hwnd, out key, out alpha, out flags)) return null;   // per-pixel transparency of its own
-            if (!layered && SetWindowLong(hwnd, GWL_EXSTYLE, ex | WS_EX_LAYERED) == 0) return null;        // refused (higher privilege)
-            if (!SetLayeredWindowAttributes(hwnd, key, 0, flags | LWA_ALPHA))
-            {
-                if (!layered) SetWindowLong(hwnd, GWL_EXSTYLE, ex);
-                return null;
-            }
-            return new Hidden(layered, (flags & LWA_ALPHA) != 0 ? alpha : (byte)255, flags, key);
-        }
-        catch { return null; }
-    }
-
-    /// <summary>The window as it was: its own transparency back, or not layered again (and drawn anew).</summary>
-    static void Visible(IntPtr hwnd, Hidden was)
-    {
-        if (was == null) return;
-        try
-        {
-            if (was.WasLayered) SetLayeredWindowAttributes(hwnd, was.Key, was.Alpha, was.Flags);
-            else
-            {
-                SetLayeredWindowAttributes(hwnd, 0, 255, LWA_ALPHA);
-                SetWindowLong(hwnd, GWL_EXSTYLE, Native.GetWindowLong(hwnd, GWL_EXSTYLE) & ~WS_EX_LAYERED);
-                RedrawWindow(hwnd, IntPtr.Zero, IntPtr.Zero, 0x1 | 0x4 | 0x80 | 0x100);   // INVALIDATE | ERASE | ALLCHILDREN | FRAME
-            }
-        }
-        catch { }
-    }
+    /// <summary>The window is where its rule puts it already.</summary>
+    static bool AtPlace(IntPtr hwnd, string place) =>
+        place == Maximized ? IsZoomed(hwnd) : int.TryParse(place, out int zone) && WindowManager.IsInZone(hwnd, zone);
 
     static void Place(IntPtr hwnd, string place)
     {

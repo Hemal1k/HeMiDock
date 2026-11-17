@@ -158,8 +158,24 @@ static class WindowManager
         if (zone < 0 || zone >= Zones.Length) return;
         var handle = Native.MonitorFromWindow(hwnd, 2);
         var all = Monitors.All();
-        Native.ShowWindow(hwnd, 9);                                   // SW_RESTORE: a maximized window would not move
+        // SW_RESTORE: a maximized (or minimized) window would not move – only then, it animates
+        if (IsZoomed(hwnd) || Native.IsIconic(hwnd)) Native.ShowWindow(hwnd, 9);
         PlaceInZone(hwnd, all.FirstOrDefault(m => m.Handle == handle) ?? all[0], Zones[zone]);
+    }
+
+    /// <summary>The window lies in the zone already (what is seen of it, within a few pixels; not maximized).</summary>
+    public static bool IsInZone(IntPtr hwnd, int zone)
+    {
+        if (zone < 0 || zone >= Zones.Length || IsZoomed(hwnd) || Native.IsIconic(hwnd)) return false;
+        if (DwmGetWindowAttribute(hwnd, 9, out var seen, Marshal.SizeOf<Native.RECT>()) != 0) return false;
+        var handle = Native.MonitorFromWindow(hwnd, 2);
+        var all = Monitors.All();
+        var m = all.FirstOrDefault(x => x.Handle == handle) ?? all[0];
+        var z = Zones[zone];
+        int w = m.Work.Right - m.Work.Left, h = m.Work.Bottom - m.Work.Top;
+        int l = m.Work.Left + (int)(z.X * w), t = m.Work.Top + (int)(z.Y * h);
+        bool Near(int a, int b) => Math.Abs(a - b) <= 4;
+        return Near(seen.Left, l) && Near(seen.Top, t) && Near(seen.Right, l + (int)(z.Width * w)) && Near(seen.Bottom, t + (int)(z.Height * h));
     }
 
     /// <summary>File names of the apps with an open window.</summary>

@@ -11,7 +11,7 @@ namespace HeMiDock;
 /// </summary>
 static class WinEvents
 {
-    public const uint Foreground = 0x3, MoveSizeStart = 0xA, MoveSizeEnd = 0xB;
+    public const uint Foreground = 0x3, MoveSizeStart = 0xA, MoveSizeEnd = 0xB, Create = 0x8000;
     public const uint Destroy = 0x8001, Show = 0x8002, Hide = 0x8003, LocationChange = 0x800B, NameChange = 0x800C, Cloaked = 0x8017, Uncloaked = 0x8018;
 
     /// <summary>An event: its kind, the window, the part of it (0 = the window itself), the child.</summary>
@@ -69,7 +69,7 @@ static class WinEvents
         string Name(uint ev) => ev switch
         {
             Foreground => "foreground", MoveSizeStart => "move start", MoveSizeEnd => "move end", Destroy => "destroy", Show => "show", Hide => "hide",
-            LocationChange => "location", NameChange => "name", Cloaked => "cloaked", Uncloaked => "uncloaked", _ => "0x" + ev.ToString("X")
+            LocationChange => "location", NameChange => "name", Cloaked => "cloaked", Uncloaked => "uncloaked", Create => "create", _ => "0x" + ev.ToString("X")
         };
         string text = string.Join(", ", Counts.OrderByDescending(c => c.Value).Select(c => $"{Name(c.Key)} {c.Value}"));
         Counts.Clear();
