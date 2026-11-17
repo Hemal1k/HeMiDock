@@ -123,20 +123,13 @@ public sealed partial class DockWindow : Window, IPanelWindow
         WindowEvents.Gone += gone; _unsubscribe.Add(() => WindowEvents.Gone -= gone);
         DockState.Changed += Later; _unsubscribe.Add(() => DockState.Changed -= Later);
         UnreadMail.Changed += Later; _unsubscribe.Add(() => UnreadMail.Changed -= Later);   // the envelope on Outlook at once
-        Action status = () => Ui.Post(UpdateStatus), badge = () => Ui.Post(UpdateBadge), desktops = () => Ui.Post(() => { UpdateDesktops(); Later(); });
-        Weather.Changed += status; _unsubscribe.Add(() => Weather.Changed -= status);
+        Action badge = () => Ui.Post(UpdateBadge), desktops = () => Ui.Post(() => { UpdateDesktops(); Later(); });
         NotificationBadge.Changed += badge; _unsubscribe.Add(() => NotificationBadge.Changed -= badge);
         NotificationBadge.Watch(true);
-        System.Net.NetworkInformation.NetworkAddressChangedEventHandler net = (_, _) => Ui.Post(UpdateStatus);
-        System.Net.NetworkInformation.NetworkChange.NetworkAddressChanged += net;
-        _unsubscribe.Add(() => System.Net.NetworkInformation.NetworkChange.NetworkAddressChanged -= net);
-        // at once, not at the next reading: the charger plugged in or out, the network gone or back
-        Microsoft.Win32.PowerModeChangedEventHandler power = (_, _) => Ui.Post(UpdateStatus);
-        Microsoft.Win32.SystemEvents.PowerModeChanged += power;
-        _unsubscribe.Add(() => Microsoft.Win32.SystemEvents.PowerModeChanged -= power);
-        System.Net.NetworkInformation.NetworkAvailabilityChangedEventHandler online = (_, _) => Ui.Post(UpdateStatus);
-        System.Net.NetworkInformation.NetworkChange.NetworkAvailabilityChanged += online;
-        _unsubscribe.Add(() => System.Net.NetworkInformation.NetworkChange.NetworkAvailabilityChanged -= online);
+        // the status icons follow StatusHub by themselves (the network, the charger, the weather, every 2 s); the dock only adds
+        // the keyboard language and the removable drives from the same reading
+        Action<StatusSnapshot> fresh = d => { if (!_closed && RightSide) ShowLanguageAndDrives(d); };
+        StatusHub.Changed += fresh; _unsubscribe.Add(() => StatusHub.Changed -= fresh);
         System.ComponentModel.PropertyChangedEventHandler settings = (_, _) => { _shown = null; _trayShown = null; _layoutShown = null; Later(); UpdateStatus(); UpdateClock(); UpdateDesktops(); };
         S.PropertyChanged += settings; _unsubscribe.Add(() => S.PropertyChanged -= settings);
         VirtualDesktops.Changed += desktops; _unsubscribe.Add(() => VirtualDesktops.Changed -= desktops);
@@ -218,10 +211,8 @@ public sealed partial class DockWindow : Window, IPanelWindow
         UpdateFullScreen();
         if (WindowGone()) Later();                                    // a window closed or hidden without a word from Windows: built again now
         if (_tick == 0) Place();                                      // once shown: placed again with its real size
-        // the status icons every 2 s (Wi-Fi signal, battery, microphone / camera in use…), the recycle bin every 5 s
-        ++_tick;
-        if (_tick % 2 == 0) UpdateStatus();
-        if (_tick % 5 == 0) UpdateBin();
+        // the recycle bin every 5 s (the status icons: StatusHub)
+        if (++_tick % 5 == 0) UpdateBin();
         if (_measure) Measure();
     }
 

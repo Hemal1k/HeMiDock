@@ -36,7 +36,7 @@ sealed class ControlCenterWindow : PopupWindow
     string _openPage;
     bool _updating;
     static WiFiAdapter _adapter;                                     // kept: its last scan is shown at once next time
-    NetworkStatusChangedEventHandler _netChanged;
+    Action _netChanged;
 
     static Brush Res(string key) => ThemeBrush.Get(key);
     static Style DockButton => (Style)Application.Current.Resources["DockButton"];
@@ -71,8 +71,9 @@ sealed class ControlCenterWindow : PopupWindow
             if (_apps.Count > 0) SyncAudio();
             if (_awakeState != null) _awakeState.Text = AwakeText();
         };
-        _netChanged = _ => Ui.Post(async () => { if (_openPage == "wifi" && _adapter != null) await BuildNetworksAsync(); else if (_openPage == null) BuildMain(); });
-        NetworkInformation.NetworkStatusChanged += _netChanged;
+        // the network through the one StatusHub of the app (a burst of the events of Windows comes as one notice)
+        _netChanged = async () => { if (_openPage == "wifi" && _adapter != null) await BuildNetworksAsync(); else if (_openPage == null) BuildMain(); };
+        StatusHub.NetworkChanged += _netChanged;
         // the sound at once when Windows tells a change (keys, the dock, another app), not with the next poll
         Action audio = () => { if (_audioPosted) return; _audioPosted = true; Ui.Post(() => { _audioPosted = false; if (_visibleNow) SyncAudio(); }); };
         AudioControl.Changed += audio;
@@ -87,7 +88,7 @@ sealed class ControlCenterWindow : PopupWindow
             if (_visibleNow && _openPage == null && !_editing) BuildMain();
         });
         BarMedia.Changed += media;
-        Closed += (_, _) => { _poll.Stop(); NetworkInformation.NetworkStatusChanged -= _netChanged; AudioControl.Changed -= audio; BarMedia.Changed -= media; };
+        Closed += (_, _) => { _poll.Stop(); StatusHub.NetworkChanged -= _netChanged; AudioControl.Changed -= audio; BarMedia.Changed -= media; };
         _poll.Start();
         BuildMain();
         _ = LoadRadiosAsync();

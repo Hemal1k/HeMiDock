@@ -247,8 +247,10 @@ sealed class StatusParts
         Action bluetooth = () => Ui.Post(ShowBluetooth);
         Action volume = () => { if (_volumePosted) return; _volumePosted = true; Ui.Post(() => { _volumePosted = false; ShowVolumeNow(); }); };
         Action update = ShowAppUpdate;
-        _icons.Loaded += (_, _) => { BluetoothWatch.Changed += bluetooth; AudioControl.Changed += volume; Updater.Changed += update; ShowAppUpdate(); };
-        _icons.Unloaded += (_, _) => { BluetoothWatch.Changed -= bluetooth; AudioControl.Changed -= volume; Updater.Changed -= update; };
+        // everything else by the one StatusHub of the app (the dock and the top bar share its readings)
+        Action<StatusSnapshot> fresh = Show;
+        _icons.Loaded += (_, _) => { BluetoothWatch.Changed += bluetooth; AudioControl.Changed += volume; Updater.Changed += update; StatusHub.Changed += fresh; ShowAppUpdate(); Update(); };
+        _icons.Unloaded += (_, _) => { BluetoothWatch.Changed -= bluetooth; AudioControl.Changed -= volume; Updater.Changed -= update; StatusHub.Changed -= fresh; };
     }
 
     /// <summary>Along the bar (the dock at a side edge: one under another).</summary>
@@ -393,11 +395,11 @@ sealed class StatusParts
         ToolTipService.SetToolTip(_security, tip);
     }
 
-    /// <summary>Read in the background (see <see cref="StatusData"/>), only shown here.</summary>
-    public async void Update()
+    /// <summary>At once with what is known; the fresh state comes from <see cref="StatusHub"/> (one reading for every bar).</summary>
+    public void Update()
     {
         if (StatusData.Last is { } last) Show(last);
-        if (await StatusData.ReadAsync() is { } now) Show(now);
+        StatusHub.Refresh();
     }
 
     public void Show(StatusSnapshot d)

@@ -159,26 +159,27 @@ sealed partial class DockWindow
 
     void Usb_Click(object sender, RoutedEventArgs e) => TrayView.ShowDrives(UsbButton, this, UpdateStatus);
 
-    /// <summary>The status icons: read in the background (see <see cref="StatusData"/>), only shown here.</summary>
-    async void UpdateStatus()
+    /// <summary>
+    /// The status part shown or not (only the dock with the right side has it), at once with what is known; the fresh state comes
+    /// from <see cref="StatusHub"/> – to the status icons by themselves, to the language and the drives through the dock.
+    /// </summary>
+    void UpdateStatus()
     {
         if (_closed) return;
         bool here = RightSide;
         StatusButton.Visibility = V(here);
         if (!here) { LangButton.Visibility = UsbButton.Visibility = Visibility.Collapsed; return; }
-        if (StatusData.Last is { } last) ShowStatus(last);           // at once with what is known, then the fresh state
-        var now = await StatusData.ReadAsync();
-        if (!_closed && now != null) ShowStatus(now);
+        if (StatusData.Last is { } last) ShowLanguageAndDrives(last);
+        _status.Update();
     }
 
     /// <summary>The keyboard language and removable drives here; the status icons themselves by StatusParts.</summary>
-    void ShowStatus(StatusSnapshot d)
+    void ShowLanguageAndDrives(StatusSnapshot d)
     {
         var layouts = d.Layouts;
         LangButton.Visibility = V(S.ShowInputLanguage && layouts.Length > 1);
         if (layouts.Length > 1) { LangText.Text = InputLanguage.Short(d.Layout); ToolTipService.SetToolTip(LangButton, InputLanguage.Name(d.Layout)); }
         UsbButton.Visibility = V(S.ShowRemovable && d.Removable > 0);
-        _status.Show(d);
     }
 
     void UpdateClock()
