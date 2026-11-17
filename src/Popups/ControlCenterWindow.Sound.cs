@@ -33,7 +33,7 @@ sealed partial class ControlCenterWindow
         if (AudioControl.Now() is { } now)
         {
             var device = new Button { Style = DockButton, Padding = new Thickness(4, 2, 4, 2), Margin = new Thickness(26, 0, 0, 0),
-                Content = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, Children = { new TextBlock { Text = now.Name, FontSize = 11, MaxWidth = 260, Foreground = Res("TextFillColorSecondaryBrush"), TextTrimming = TextTrimming.CharacterEllipsis }, new FontIcon { Glyph = "", FontSize = 9 } } } };
+                Content = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, Children = { new TextBlock { Text = AudioDevices.Shown(now.Name), FontSize = 11, MaxWidth = 260, Foreground = Res("TextFillColorSecondaryBrush"), TextTrimming = TextTrimming.CharacterEllipsis }, new FontIcon { Glyph = "", FontSize = 9 } } } };
             ToolTipService.SetToolTip(device, L.T("Choose a sound output"));
             device.Click += (_, _) => ShowSound();
             panel.Children.Add(device);
@@ -45,7 +45,7 @@ sealed partial class ControlCenterWindow
             if (AudioControl.MicName() is { Length: > 0 } micName)
             {
                 var input = new Button { Style = DockButton, Padding = new Thickness(4, 2, 4, 2), Margin = new Thickness(26, 0, 0, 0),
-                    Content = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, Children = { new TextBlock { Text = micName, FontSize = 11, MaxWidth = 260, Foreground = Res("TextFillColorSecondaryBrush"), TextTrimming = TextTrimming.CharacterEllipsis }, new FontIcon { Glyph = "\uE76C", FontSize = 9 } } } };
+                    Content = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, Children = { new TextBlock { Text = AudioDevices.Shown(micName), FontSize = 11, MaxWidth = 260, Foreground = Res("TextFillColorSecondaryBrush"), TextTrimming = TextTrimming.CharacterEllipsis }, new FontIcon { Glyph = "\uE76C", FontSize = 9 } } } };
                 ToolTipService.SetToolTip(input, L.T("Choose a sound input"));
                 input.Click += (_, _) => ShowSound();
                 panel.Children.Add(input);
@@ -165,7 +165,7 @@ sealed partial class ControlCenterWindow
         var card = PageCard(L.T(title));
         foreach (var d in devices)
         {
-            string id = d.ID, name = d.FriendlyName;
+            string id = d.ID, name = AudioDevices.Shown(d.FriendlyName);
             d.Dispose();
             card.Children.Add(PageRow(glyph, name, id == current, id == current ? null : async () =>
             {

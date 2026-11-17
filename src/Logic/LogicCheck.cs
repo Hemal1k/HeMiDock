@@ -38,6 +38,11 @@ static class LogicCheck
             Check($"converter \"{text}\" = {expect}", () => (Converter.TryConvert(text, out _, out var number, out _) && Number(number) == expect, number));
         Check("converter refuses \"10 km to kg\"", () => (!Converter.TryConvert("10 km to kg", out var r, out _, out _), r));
 
+        // ── the names of sound devices: a monitor without the number of its port and the driver, the others whole
+        foreach (var (name, expect) in new[] { ("4 - Odyssey G95SC (AMD High Definition Audio Device)", "Odyssey G95SC"), ("12 - DELL U2723QE (NVIDIA High Definition Audio)", "DELL U2723QE"),
+                                               ("Speakers (Realtek(R) Audio)", "Speakers (Realtek(R) Audio)"), ("Headset (Fractal Scape Dongle)", "Headset (Fractal Scape Dongle)") })
+            Check($"sound device \"{name}\" = \"{expect}\"", () => (AudioDevices.Shown(name) == expect, AudioDevices.Shown(name)));
+
         // ── the window zones of the settings
         Check("zones: two halves, the broken one left out", () =>
         {

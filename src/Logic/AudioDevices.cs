@@ -10,6 +10,18 @@ namespace HeMiDock;
 /// </summary>
 static class AudioDevices
 {
+    /// <summary>
+    /// The name of a device as shown: the sound of a monitor comes from Windows as "4 - Odyssey G95SC (AMD High Definition
+    /// Audio Device)" – the number of its port on the graphics card and the driver; shown is only "Odyssey G95SC". Other
+    /// names stay whole: "Speakers (Fractal Scape Dongle)" needs its brackets.
+    /// </summary>
+    public static string Shown(string name)
+    {
+        if (string.IsNullOrEmpty(name)) return name;
+        var m = System.Text.RegularExpressions.Regex.Match(name, @"^\d+\s*-\s*(.+?)(\s*\([^()]*(\([^()]*\))?[^()]*\))?$");
+        return m.Success && m.Groups[1].Value.Trim().Length > 0 ? m.Groups[1].Value.Trim() : name;
+    }
+
     // Windows has no public API for the default device – every sound switcher uses this interface of Windows itself.
     // Only SetDefaultEndpoint is called; the methods before it just keep its place in the interface.
     [ComImport, Guid("f8679f50-850a-41cf-9c72-430f290290c8"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]

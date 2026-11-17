@@ -83,7 +83,7 @@ static class QuickControls
             Get = () => Value(() => PowerMode.Current is Guid g && Array.IndexOf(PowerModes, g) is int i && i >= 0 ? i : null),
             Set = v => Do(() => PowerMode.Set(PowerModes[Math.Clamp((int)v, 0, 2)])) };
         yield return new() { Id = "output", Name = "Sound output", Glyph = "", Type = ControlType.Choice, Keywords = "sound output|output|speakers|headphones|audio device|zvukovy vystup|vystup|reproduktory|sluchatka|zvukove zarizeni",
-            Options = () => Outputs().Select(d => d.FriendlyName).ToList(),
+            Options = () => Outputs().Select(d => AudioDevices.Shown(d.FriendlyName)).ToList(),
             Get = () => Value(() => AudioControl.Now()?.Name is string now && Outputs().FindIndex(d => d.FriendlyName == now) is int i && i >= 0 ? i : null),
             Set = v => Do(() => { var all = Outputs(); if ((int)v >= 0 && (int)v < all.Count) AudioDevices.SetDefault(all[(int)v].ID); }) };
 
