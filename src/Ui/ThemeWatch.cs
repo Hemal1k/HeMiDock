@@ -30,7 +30,7 @@ static class ThemeWatch
             if ((s.ThemeMode, s.AccentMode, s.AccentColor, s.Blur) != _shown) Refresh();
             // the windows follow at once; the menus, tooltips and dialogs only after a restart (another light / dark than at
             // the start) – a moment later, so the setting is saved and the choice box closed first
-            if (themeChanged) Ui.Post(async () => { await Task.Delay(400); App.RestartForTheme(); });
+            if (themeChanged) Ui.Post(async () => { await Task.Delay(120); App.RestartForTheme(); });
         };
         Refresh();
     }

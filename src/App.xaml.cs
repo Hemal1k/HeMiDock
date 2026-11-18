@@ -527,7 +527,8 @@ public partial class App : Application
         ((App)Current).Cleanup();
         // the taskbar of Windows is back by now: should something still hold the process (it once stayed without any window),
         // it ends a moment later anyway
-        new Thread(() => { Thread.Sleep(3000); Environment.Exit(0); }) { IsBackground = true }.Start();
+        // a restart for the theme ends at once (the new dock waits only for that), otherwise 3 s later at the latest
+        new Thread(() => { Thread.Sleep(_restarting ? 150 : 3000); Environment.Exit(0); }) { IsBackground = true }.Start();
         Current.Exit();
     }
 }
