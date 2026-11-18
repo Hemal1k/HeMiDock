@@ -88,7 +88,7 @@ sealed partial class DockWindow
         if (!S.DockEditMode || !e.GetCurrentPoint(part).Properties.IsLeftButtonPressed || !Native.GetCursorPos(out var from)) return;
         if (part == Tray && e.OriginalSource != Tray) return;            // a tray icon: its own drag
         if (AtInnerEdge(e.GetCurrentPoint(Root).Position)) return;         // the size of the dock is dragged there
-        var follow = DispatcherQueue.CreateTimer();
+        var follow = QueueTimer.Create();
         follow.Interval = TimeSpan.FromMilliseconds(12);
         bool dragging = false;
         follow.Tick += (_, _) =>
@@ -173,7 +173,7 @@ sealed partial class DockWindow
         double longest = (Vertical ? _mon.Work.Bottom - _mon.Work.Top : _mon.Work.Right - _mon.Work.Left) / Scale;
         ResetMagnification();
         _sizing = true;
-        var follow = DispatcherQueue.CreateTimer();
+        var follow = QueueTimer.Create();
         follow.Interval = TimeSpan.FromMilliseconds(16);
         follow.Tick += (_, _) =>
         {
@@ -208,7 +208,7 @@ sealed partial class DockWindow
         double size = S.IconSize;
         ResetMagnification();
         _sizing = true;
-        var follow = DispatcherQueue.CreateTimer();
+        var follow = QueueTimer.Create();
         follow.Interval = TimeSpan.FromMilliseconds(16);
         follow.Tick += (_, _) =>
         {
@@ -307,7 +307,7 @@ sealed partial class DockWindow
     {
         if (entry.Pin == null || !e.GetCurrentPoint(button).Properties.IsLeftButtonPressed || !Native.GetCursorPos(out var from)) return;
         if (S.DockEditMode && AtInnerEdge(e.GetCurrentPoint(Root).Position)) return;   // the size of the dock is dragged there
-        var follow = DispatcherQueue.CreateTimer();
+        var follow = QueueTimer.Create();
         follow.Interval = TimeSpan.FromMilliseconds(12);
         bool dragging = false;
         follow.Tick += (_, _) =>

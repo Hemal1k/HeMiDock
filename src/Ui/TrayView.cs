@@ -43,7 +43,7 @@ static class TrayView
             if (b == 0) ShellHost.Click(item, 0, down: true);              // the press waited for the release
             ShellHost.Click(item, b, down: false);
         }
-        Microsoft.UI.Dispatching.DispatcherQueueTimer follow = null;
+        QueueTimer follow = null;
         Native.POINT pressAt = default;
         bool dragging = false, pressedHere = false;
         void Follow()
@@ -79,7 +79,7 @@ static class TrayView
                 pressAt = at;
                 dragging = false;
                 follow?.Stop();
-                follow = border.DispatcherQueue.CreateTimer();
+                follow = QueueTimer.Create();
                 follow.Interval = TimeSpan.FromMilliseconds(12);
                 follow.Tick += (_, _) => Follow();
                 follow.Start();

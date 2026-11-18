@@ -827,7 +827,7 @@ sealed partial class SettingsWindow : Window
         var old = (card.BorderBrush, card.BorderThickness);
         card.BorderBrush = ThemeBrush.Accent;
         card.BorderThickness = new Thickness(2);
-        var timer = card.DispatcherQueue.CreateTimer();
+        var timer = QueueTimer.Create();
         timer.Interval = TimeSpan.FromMilliseconds(1600);
         timer.IsRepeating = false;
         timer.Tick += (_, _) => { card.BorderBrush = old.BorderBrush; card.BorderThickness = old.Item2; };

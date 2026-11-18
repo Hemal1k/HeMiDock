@@ -73,7 +73,7 @@ class PopupWindow : Window
         int frames = 0;
         bool done = false;
         EventHandler<object> onFrame = null;
-        Microsoft.UI.Dispatching.DispatcherQueueTimer late = null;
+        QueueTimer late = null;
         void Uncloak()
         {
             if (done) return;
@@ -85,7 +85,7 @@ class PopupWindow : Window
         }
         onFrame = (_, _) => { if (++frames >= 2) Uncloak(); };
         Microsoft.UI.Xaml.Media.CompositionTarget.Rendering += onFrame;
-        late = DispatcherQueue.CreateTimer();
+        late = QueueTimer.Create();
         late.Interval = TimeSpan.FromMilliseconds(250);
         late.IsRepeating = false;
         late.Tick += (_, _) => Uncloak();

@@ -414,6 +414,17 @@ namespace ManagedShell.WindowsTasks
             }
         }
 
+        // the reason a window is left out of the taskbar, logged only when it changes: it is asked again for every window of
+        // an app whenever one of them comes to the front (four hidden windows of Explorer gave four lines each time)
+        private string _hiddenWhy;
+
+        private void LogHidden(string why)
+        {
+            if (_hiddenWhy == why) return;
+            _hiddenWhy = why;
+            ShellLogger.Debug($"ApplicationWindow: {Handle} ({LogName}) hidden from taskbar: {why}");
+        }
+
         private bool getShowInTaskbar()
         {
             // EnumWindows and ShellHook return UWP app windows that are 'cloaked', which should not be visible in the taskbar.
@@ -424,18 +435,19 @@ namespace ManagedShell.WindowsTasks
 
                 if (cloaked > 0)
                 {
-                    ShellLogger.Debug($"ApplicationWindow: Cloaked window {Handle} ({LogName}) hidden from taskbar");
+                    LogHidden("cloaked");
                     return false;
                 }
 
                 // UWP shell windows that are not cloaked should be hidden from the taskbar, too.
                 if (IsImmersiveShellWindow())
                 {
-                    ShellLogger.Debug($"ApplicationWindow: Hiding immersive shell window {Handle} ({LogName}) from taskbar");
+                    LogHidden("immersive shell window");
                     return false;
                 }
             }
 
+            _hiddenWhy = null;
             return CanAddToTaskbar;
         }
 

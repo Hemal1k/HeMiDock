@@ -100,7 +100,7 @@ sealed partial class StartWindow
         button.AddHandler(UIElement.PointerPressedEvent, new Microsoft.UI.Xaml.Input.PointerEventHandler((_, a) =>
         {
             if (!a.GetCurrentPoint(button).Properties.IsLeftButtonPressed || !Native.GetCursorPos(out var from)) return;
-            var follow = DispatcherQueue.CreateTimer();
+            var follow = QueueTimer.Create();
             follow.Interval = TimeSpan.FromMilliseconds(12);
             bool dragging = false;
             follow.Tick += (_, _) =>
