@@ -186,9 +186,11 @@ public partial class App : Application
         ExplorerVerb.TakeRequests();
         if (!DockSettings.Current.SetupDone)
         {
-            // the first start: the guide comes before the dock
+            // the first start: the dock at once and the guide over it – a look chosen in the guide shows on the dock right
+            // away (the user, 2026-11-19: the dock came only after the guide, so the choice was not seen)
             DockSettings.Current.StartAtSignIn = true;                 // on unless the user turns it off in the guide
-            SetupWindow.Open(() => StartDocks(cmd, open));
+            StartDocks(cmd, open);
+            SetupWindow.Open();
             return;
         }
         StartDocks(cmd, open);

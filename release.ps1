@@ -27,7 +27,10 @@ foreach ($rid in 'win-x64', 'win-arm64') {
     dotnet publish src\HeMiDock.csproj -c Release -r $rid -o "$work\app-$rid" -v q -nologo
     if ($LASTEXITCODE) { throw "The build of the app failed ($rid)." }
 }
-& $iscc /Q "/DAppVersion=$version" "/DSourceDir=$work\app-win-x64" "/DSourceDirArm=$work\app-win-arm64" "/DOutputDir=$dist" (Join-Path $root 'installer\HeMiDock.iss')
+# the Windows App Runtime the app needs at least: the version of the Windows App SDK it is built with
+$sdk = ([xml](Get-Content src\HeMiDock.csproj -Raw -Encoding utf8)).Project.ItemGroup.PackageReference | Where-Object Include -eq 'Microsoft.WindowsAppSDK' | Select-Object -First 1 -ExpandProperty Version
+if ($sdk -notmatch '^\d+\.\d+\.\d+$') { throw "The version of Microsoft.WindowsAppSDK is not X.Y.Z ($sdk)." }
+& $iscc /Q "/DAppVersion=$version" "/DAppRuntimeMin=$sdk.0" "/DSourceDir=$work\app-win-x64" "/DSourceDirArm=$work\app-win-arm64" "/DOutputDir=$dist" (Join-Path $root 'installer\HeMiDock.iss')
 if ($LASTEXITCODE) { throw 'The installer could not be made.' }
 
 # the portable apps: .NET and the Windows App Runtime inside; the files right in the zip, no folder around them

@@ -3,6 +3,11 @@
 ; what is missing from Microsoft (only that asks for administrator rights). /UPDATE (the update of the app): quiet, starts the
 ; dock again afterwards.
 
+; the Windows App Runtime the app needs at least: release.ps1 passes the version of the Windows App SDK of the app
+; (HeMiDock built with 2.6.4 does not start on 2.6.0 – 2.6.3: the check of 2.6.0 let the installer skip it, 2026-11-19)
+#ifndef AppRuntimeMin
+  #define AppRuntimeMin "2.6.4.0"
+#endif
 #ifndef AppVersion
   #define AppVersion "0.0.0"
 #endif
@@ -77,9 +82,10 @@ Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs 
 [Tasks]
 ; offered on its own page, off by default
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
-; the updates of the dock (written for it to take at its next start – see SaveUpdateChoice); installing them needs looking for them
-Name: "updates"; Description: "{cm:UpdateCheck}"; GroupDescription: "{cm:Updates}"
-Name: "updates\install"; Description: "{cm:UpdateInstall}"; GroupDescription: "{cm:Updates}"; Flags: unchecked
+; the updates of the dock (written for it to take at its next start – see SaveUpdateChoice); installing them needs looking for them.
+; Not asked when HeMi Launcher installs it (/LAUNCHER): the launcher looks for and installs the updates itself
+Name: "updates"; Description: "{cm:UpdateCheck}"; GroupDescription: "{cm:Updates}"; Check: NotFromLauncher
+Name: "updates\install"; Description: "{cm:UpdateInstall}"; GroupDescription: "{cm:Updates}"; Flags: unchecked; Check: NotFromLauncher
 
 [Icons]
 Name: "{autoprograms}\HeMiDock"; Filename: "{app}\HeMiDock.exe"
@@ -128,6 +134,12 @@ var
   WasRunning: Boolean;
   // HeMiDock was installed before (an update, a repair or a move from the old folder)
   Upgrade: Boolean;
+
+{ installed by HeMi Launcher (/LAUNCHER): it takes care of the updates, the installer does not ask about them }
+function NotFromLauncher: Boolean;
+begin
+  Result := Pos('/LAUNCHER', Uppercase(GetCmdTail)) = 0;
+end;
 
 function WasInstalled: Boolean;
 begin
@@ -179,8 +191,9 @@ var
 begin
   if WizardSilent and Upgrade then Exit;
   Check := 0; Install := 0;
-  if WizardIsTaskSelected('updates') then Check := 1;
-  if WizardIsTaskSelected('updates\install') then Install := 1;
+  // HeMi Launcher keeps the dock up to date: the dock itself does not look (it can be switched on in its settings)
+  if NotFromLauncher and WizardIsTaskSelected('updates') then Check := 1;
+  if NotFromLauncher and WizardIsTaskSelected('updates\install') then Install := 1;
   RegWriteDWordValue(HKCU, 'Software\HeMi\HeMiDock', 'SetupCheckUpdates', Check);
   RegWriteDWordValue(HKCU, 'Software\HeMi\HeMiDock', 'SetupInstallUpdates', Install);
 end;
@@ -230,7 +243,7 @@ begin
   if Result then FindClose(Found);
 end;
 
-{ the Windows App Runtime 2.6 or newer (x64), asked by PowerShell }
+{ the Windows App Runtime the app was built with, or newer, of this processor – asked by PowerShell }
 function AppxArch: String;
 begin
   if Arch = 'arm64' then Result := 'Arm64' else Result := 'X64';
@@ -241,7 +254,7 @@ var
   Code: Integer;
 begin
   Result := Exec('powershell.exe',
-    '-NoProfile -ExecutionPolicy Bypass -Command "if (Get-AppxPackage -Name Microsoft.WindowsAppRuntime.2 | Where-Object { $_.Architecture -eq ''' + AppxArch + ''' -and $_.Version -ge [version]''2.6.0.0'' }) { exit 0 } else { exit 1 }"',
+    '-NoProfile -ExecutionPolicy Bypass -Command "if (Get-AppxPackage -Name Microsoft.WindowsAppRuntime.2 | Where-Object { $_.Architecture -eq ''' + AppxArch + ''' -and $_.Version -ge [version]''{#AppRuntimeMin}'' }) { exit 0 } else { exit 1 }"',
     '', SW_HIDE, ewWaitUntilTerminated, Code) and (Code = 0);
 end;
 

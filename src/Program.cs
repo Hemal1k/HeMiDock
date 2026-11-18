@@ -65,9 +65,9 @@ static class Program
         // started by the installer after an update: when a dock runs already, nothing (not its settings)
         if (args.Contains("--after-update") && Mutex.TryOpenExisting("HeMiDock_SingleInstance", out _)) return;
 #if HEMI_BOOTSTRAP
-        // only now the Windows App Runtime (the installed release; the portable one carries it): missing, Windows offers it
-        // with a window and the app ends – what the installer starts above never asks
-        if (!FindRuntime(out int hr)) { Environment.Exit(hr); return; }
+        // only now the Windows App Runtime (the installed release; the portable one carries it) – what the installer starts
+        // above never asks. Missing or too old: HeMiDock offers to install it from Microsoft itself and goes on
+        if (!FindRuntime(out int hr) && !(OfferRuntime() && FindRuntime(out hr))) { Environment.Exit(hr); return; }
 #endif
         WinRT.ComWrappersSupport.InitializeComWrappers();
         Application.Start(p =>
@@ -84,6 +84,49 @@ static class Program
         Microsoft.Windows.ApplicationModel.DynamicDependency.Bootstrap.TryInitialize(
             Microsoft.WindowsAppSDK.Release.MajorMinor, Microsoft.WindowsAppSDK.Release.VersionTag,
             new Microsoft.Windows.ApplicationModel.DynamicDependency.PackageVersion(Microsoft.WindowsAppSDK.Runtime.Version.UInt64),
-            Microsoft.Windows.ApplicationModel.DynamicDependency.Bootstrap.InitializeOptions.OnNoMatch_ShowUI, out hr);
+            Microsoft.Windows.ApplicationModel.DynamicDependency.Bootstrap.InitializeOptions.None, out hr);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+    static extern int MessageBoxW(nint hwnd, string text, string caption, uint type);
+
+    /// <summary>The Windows App Runtime is missing or too old: asked, then its installer from Microsoft runs quietly (it needs
+    /// no administrator rights – without them it is installed for this user). True when it ran.</summary>
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    static bool OfferRuntime()
+    {
+        const ushort major = Microsoft.WindowsAppSDK.Runtime.Version.Major, minor = Microsoft.WindowsAppSDK.Runtime.Version.Minor;
+        string need = $"{major}.{minor}.{Microsoft.WindowsAppSDK.Runtime.Version.Build}";
+        bool cs = System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "cs";
+        string ask = cs
+            ? $"HeMiDock potřebuje Windows App Runtime {need} nebo novější od Microsoftu a na tomto PC chybí (nebo je starší).\n\nStáhnout a nainstalovat ho teď? Trvá to chvilku, pak se HeMiDock spustí."
+            : $"HeMiDock needs the Windows App Runtime {need} or newer from Microsoft, and this PC lacks it (or has an older one).\n\nDownload and install it now? It takes a moment, then HeMiDock starts.";
+        // MB_YESNO | MB_ICONQUESTION | MB_SETFOREGROUND: Yes = 6
+        if (MessageBoxW(0, ask, "HeMiDock", 0x4 | 0x20 | 0x10000) != 6) return false;
+        string arch = System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture == System.Runtime.InteropServices.Architecture.Arm64 ? "arm64" : "x64";
+        string url = $"https://aka.ms/windowsappsdk/{major}.{minor}/latest/windowsappruntimeinstall-{arch}.exe";
+        string file = Path.Combine(Path.GetTempPath(), $"windowsappruntimeinstall-{arch}.exe");
+        try
+        {
+            using (var http = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromMinutes(10) })
+            using (var s = http.GetStreamAsync(url).GetAwaiter().GetResult())
+            using (var f = File.Create(file))
+                s.CopyTo(f);
+            using var p = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(file, "--quiet") { UseShellExecute = false, CreateNoWindow = true });
+            p?.WaitForExit();
+            return true;
+        }
+        catch (Exception e)
+        {
+            string fail = cs
+                ? $"Windows App Runtime se nepodařilo nainstalovat: {e.Message}\n\nStáhni ho ručně: https://learn.microsoft.com/windows/apps/windows-app-sdk/downloads"
+                : $"The Windows App Runtime could not be installed: {e.Message}\n\nGet it by hand: https://learn.microsoft.com/windows/apps/windows-app-sdk/downloads";
+            MessageBoxW(0, fail, "HeMiDock", 0x10 | 0x10000);
+            return false;
+        }
+        finally
+        {
+            try { File.Delete(file); } catch { }
+        }
+    }
 #endif
 }
