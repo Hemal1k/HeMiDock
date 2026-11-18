@@ -57,6 +57,10 @@ static class Program
             Watchdog.Run(pid);
             return;
         }
+        // started again by the dock itself (another light / dark theme of the app): the old one ends first (at most 10 s)
+        int waitAt = Array.IndexOf(args, "--wait-pid");
+        if (waitAt >= 0 && waitAt + 1 < args.Length && int.TryParse(args[waitAt + 1], out int old))
+            try { System.Diagnostics.Process.GetProcessById(old).WaitForExit(10000); } catch { }
         // the start at sign-in comes twice (the task and the Run value, see Autostart): the second one, or one switched off in
         // Task Manager, ends here at once – before anything of WinUI is loaded
         if (args.Contains(Autostart.StartupArg)

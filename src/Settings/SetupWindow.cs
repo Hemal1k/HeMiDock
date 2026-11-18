@@ -15,12 +15,24 @@ sealed class SetupWindow : Window
 {
     static SetupWindow _open;
 
+    public static bool IsOpen => _open != null;
+
+    /// <summary>Runs once when the guide is closed (a restart for another theme of the app waits for it).</summary>
+    public static Action AfterClose;
+
     /// <summary>Opens the guide (or brings it to the front); <paramref name="closed"/> runs when it is closed.</summary>
     public static void Open(Action closed = null)
     {
         if (_open != null) { _open.Activate(); return; }
         _open = new SetupWindow();
-        _open.Closed += (_, _) => { _open = null; closed?.Invoke(); };
+        _open.Closed += (_, _) =>
+        {
+            _open = null;
+            closed?.Invoke();
+            var after = AfterClose;
+            AfterClose = null;
+            after?.Invoke();
+        };
         _open.Activate();
     }
 

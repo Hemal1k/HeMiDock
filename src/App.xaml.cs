@@ -34,6 +34,8 @@ public partial class App : Application
             var theme = DockSettings.Current.ThemeMode;
             if (theme == 1) RequestedTheme = ApplicationTheme.Light;
             else if (theme == 2) RequestedTheme = ApplicationTheme.Dark;
+            Theme.Refresh();
+            StartedLight = Theme.IsLight;
         }
         catch (Exception ex) { Log.Write("App theme", ex); }
         // only in debug mode (without it the app writes no logs): the error, and the events before it into crash-context.txt
@@ -486,6 +488,33 @@ public partial class App : Application
         try { ToastMover.Apply(false); } catch { }
         try { DockSettings.Current.Save(); } catch { }
         ShellHost.Stop();                                              // the taskbar of Windows comes back, the apps give their icons to Explorer
+    }
+
+    /// <summary>Light or dark when the app started: the menus, tooltips and dialogs keep it until a restart (WinUI sets the
+    /// theme of the app only at its start).</summary>
+    internal static bool StartedLight { get; private set; }
+    static bool _restarting;
+
+    /// <summary>
+    /// The theme of the app changed in the settings to another light / dark than at the start: the dock starts again with its
+    /// settings open – otherwise the menus, tooltips and dialogs stayed in the old theme (the user, 2026-11-19: "the app has
+    /// to be restarted, else it is broken"). While the guide is open, it waits until the guide is closed.
+    /// </summary>
+    internal static void RestartForTheme()
+    {
+        if (_quitting || _restarting || Theme.IsLight == StartedLight) return;
+        if (SetupWindow.IsOpen) { SetupWindow.AfterClose = RestartForTheme; return; }
+        _restarting = true;
+        try
+        {
+            var start = new System.Diagnostics.ProcessStartInfo(Environment.ProcessPath) { UseShellExecute = false };
+            start.ArgumentList.Add("--wait-pid");
+            start.ArgumentList.Add(Environment.ProcessId.ToString());
+            start.ArgumentList.Add("--settings");
+            System.Diagnostics.Process.Start(start);
+        }
+        catch (Exception ex) { Log.Write("Restart for the theme", ex); _restarting = false; return; }
+        Quit();
     }
 
     internal static void Quit()
