@@ -76,6 +76,7 @@ static class Updater
     public static void Start()
     {
         if (_daily != null) return;
+        TakeSetupChoice();
         var queue = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
         var first = queue.CreateTimer();
         first.Interval = TimeSpan.FromSeconds(30);
@@ -92,6 +93,24 @@ static class Updater
         _launcher.Tick += (_, _) => WatchLauncher();
         _launcher.Start();
         WatchLauncher();
+    }
+
+    /// <summary>
+    /// What was chosen in the installer (Updates: look for them, install them): it writes it to HKCU\Software\HeMi\HeMiDock
+    /// instead of starting the app; taken into the settings once and removed.
+    /// </summary>
+    static void TakeSetupChoice()
+    {
+        try
+        {
+            using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\HeMi\HeMiDock", writable: true);
+            if (key == null) return;
+            if (key.GetValue("SetupCheckUpdates") is int check) DockSettings.Current.CheckUpdates = check != 0;
+            if (key.GetValue("SetupInstallUpdates") is int install) DockSettings.Current.InstallUpdates = install != 0;
+            key.DeleteValue("SetupCheckUpdates", false);
+            key.DeleteValue("SetupInstallUpdates", false);
+        }
+        catch (Exception ex) { Log.Write("Setup choice", ex); }
     }
 
     static Microsoft.UI.Dispatching.DispatcherQueueTimer _launcher;
@@ -125,7 +144,13 @@ static class Updater
                         sums = a.GetProperty("browser_download_url").GetString();
             var release = new Release(version, root.TryGetProperty("name", out var n) ? n.GetString() : tag, root.GetProperty("html_url").GetString(), setup, sums);
             bool newer = version > Current && !(quiet && DockSettings.Current.SkippedUpdate == version.ToString());
-            Ui.Post(() => { Available = newer ? release : null; Changed?.Invoke(); });
+            Ui.Post(() =>
+            {
+                Available = newer ? release : null;
+                Changed?.Invoke();
+                // the automatic check with "Install updates automatically": installed right away (the dock starts again)
+                if (newer && quiet && DockSettings.Current.InstallUpdates && Installed) _ = InstallAsync(release);
+            });
             return release;
         }
         catch (Exception ex) { Log.Write("Update check", ex); return null; }

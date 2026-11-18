@@ -21,6 +21,8 @@ sealed partial class SettingsWindow
     void GeneralUpdates(StackPanel general)
     {
         ToggleRow(general, "Check for updates automatically", null, nameof(DockSettings.CheckUpdates));
+        var install = ToggleRow(general, "Install updates automatically", "A new version found is installed at once – the dock starts again", nameof(DockSettings.InstallUpdates));
+        Depends(install, () => DockSettings.Current.CheckUpdates && Updater.Installed);
         var check = new Button { Content = L.T("Check now") };
         var checkText = new TextBlock { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 12, 0), Foreground = ThemeBrush.Get("TextFillColorSecondaryBrush") };
         check.Click += async (_, _) =>

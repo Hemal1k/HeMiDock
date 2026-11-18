@@ -56,6 +56,9 @@ Name: "en"; MessagesFile: "compiler:Default.isl"
 en.Prereq=Installing what HeMiDock needs: %1
 en.PrereqFailed=%1 could not be installed. Please install it by hand and run the installer again:%n%2
 en.LaunchAfter=Start HeMiDock
+en.Updates=Updates:
+en.UpdateCheck=Look for new versions automatically
+en.UpdateInstall=Install them automatically (the dock restarts)
 en.NeedTitle=Components from Microsoft
 en.NeedDesc=HeMiDock needs components that are missing on this PC.
 en.NeedText=The installer downloads them directly from Microsoft and installs them (Windows asks for administrator rights). They come with Microsoft's license terms – please read them before you continue:
@@ -74,6 +77,9 @@ Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs 
 [Tasks]
 ; offered on its own page, off by default
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
+; the updates of the dock (written for it to take at its next start – see SaveUpdateChoice); installing them needs looking for them
+Name: "updates"; Description: "{cm:UpdateCheck}"; GroupDescription: "{cm:Updates}"
+Name: "updates\install"; Description: "{cm:UpdateInstall}"; GroupDescription: "{cm:Updates}"; Flags: unchecked
 
 [Icons]
 Name: "{autoprograms}\HeMiDock"; Filename: "{app}\HeMiDock.exe"
@@ -105,6 +111,9 @@ Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Explorer\StartupA
 Root: HKCU; Subkey: "Software\Classes\Local Settings\Software\Microsoft\Windows\Shell\MuiCache"; ValueType: none; ValueName: "{app}\HeMiDock.exe.FriendlyAppName"; Flags: uninsdeletevalue dontcreatekey
 Root: HKCU; Subkey: "Software\Classes\Local Settings\Software\Microsoft\Windows\Shell\MuiCache"; ValueType: none; ValueName: "{app}\HeMiDock.exe.ApplicationCompany"; Flags: uninsdeletevalue dontcreatekey
 Root: HKCU; Subkey: "Software\Classes\Applications\HeMiDock.exe"; Flags: uninsdeletekey dontcreatekey
+Root: HKCU; Subkey: "Software\HeMi\HeMiDock"; ValueType: none; ValueName: "SetupCheckUpdates"; Flags: uninsdeletevalue dontcreatekey
+Root: HKCU; Subkey: "Software\HeMi\HeMiDock"; ValueType: none; ValueName: "SetupInstallUpdates"; Flags: uninsdeletevalue dontcreatekey
+Root: HKCU; Subkey: "Software\HeMi\HeMiDock"; Flags: uninsdeletekeyifempty dontcreatekey
 Root: HKCU; Subkey: "Software\HeMi"; Flags: uninsdeletekeyifempty dontcreatekey
 
 [Code]
@@ -162,8 +171,23 @@ begin
   if OldFolder <> '' then DelTree(OldFolder, True, True, True);
 end;
 
+{ the choice of the updates for the dock to take at its next start (HKCU\Software\HeMi\HeMiDock) – not by starting it. A
+  quiet update keeps what was set in the app; a new installation (also by winget) and an installation by hand write it. }
+procedure SaveUpdateChoice;
+var
+  Check, Install: Cardinal;
+begin
+  if WizardSilent and Upgrade then Exit;
+  Check := 0; Install := 0;
+  if WizardIsTaskSelected('updates') then Check := 1;
+  if WizardIsTaskSelected('updates\install') then Install := 1;
+  RegWriteDWordValue(HKCU, 'Software\HeMi\HeMiDock', 'SetupCheckUpdates', Check);
+  RegWriteDWordValue(HKCU, 'Software\HeMi\HeMiDock', 'SetupInstallUpdates', Install);
+end;
+
 procedure CurStepChanged(CurStep: TSetupStep);
 begin
+  if CurStep = ssInstall then SaveUpdateChoice;   { before the dock may start again at the end }
   if CurStep = ssPostInstall then DeleteOld;
 end;
 

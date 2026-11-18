@@ -672,6 +672,9 @@ public partial class DockSettings : INotifyPropertyChanged
     bool _checkUpdates = true;
     /// <summary>New versions looked for on GitHub after the start and once a day (on: the update is what the user asked for).</summary>
     public bool CheckUpdates { get => _checkUpdates; set => Set(ref _checkUpdates, value); }
+    bool _installUpdates;
+    /// <summary>A new version found by the automatic check is installed at once (installed dock only; off by default).</summary>
+    public bool InstallUpdates { get => _installUpdates; set => Set(ref _installUpdates, value); }
     string _skippedUpdate = "";
     /// <summary>A version the user chose to skip ("1.6.0"): not offered by the automatic check.</summary>
     public string SkippedUpdate { get => _skippedUpdate; set => Set(ref _skippedUpdate, value ?? ""); }

@@ -650,6 +650,8 @@ static class L
         ["No antivirus is on – the PC is not protected."] = "Žádný antivirus není zapnutý – PC není chráněné.",
         ["Updates"] = "Aktualizace",
         ["Check for updates automatically"] = "Automaticky hledat aktualizace",
+        ["Install updates automatically"] = "Automaticky instalovat aktualizace",
+        ["A new version found is installed at once – the dock starts again"] = "Nalezená nová verze se hned nainstaluje – dock se znovu spustí",
         ["Check for updates"] = "Hledat aktualizace",
         ["Check now"] = "Zkontrolovat",
         ["Checking…"] = "Hledám…",
