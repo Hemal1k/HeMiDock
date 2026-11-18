@@ -48,7 +48,10 @@ UninstallDisplayIcon={app}\HeMiDock.exe
 UninstallDisplayName=HeMiDock
 Compression=lzma2/max
 SolidCompression=yes
-WizardStyle=modern
+; the look of Windows 11, light or dark as Windows, and as big as the first question of the installer (it was
+; smaller and old-looking next to it, 2026-11-19)
+WizardStyle=modern dynamic windows11
+WizardSizePercent=120
 CloseApplications=force
 RestartApplications=no
 LicenseFile=..\LICENSE
@@ -85,7 +88,8 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 ; the updates of the dock (written for it to take at its next start – see SaveUpdateChoice); installing them needs looking for them.
 ; Not asked when HeMi Launcher installs it (/LAUNCHER): the launcher looks for and installs the updates itself
 Name: "updates"; Description: "{cm:UpdateCheck}"; GroupDescription: "{cm:Updates}"; Check: NotFromLauncher
-Name: "updates\install"; Description: "{cm:UpdateInstall}"; GroupDescription: "{cm:Updates}"; Flags: unchecked; Check: NotFromLauncher
+; two separate boxes (as parent and child, unticking the second unticked the first too, 2026-11-19)
+Name: "updatesinstall"; Description: "{cm:UpdateInstall}"; GroupDescription: "{cm:Updates}"; Flags: unchecked; Check: NotFromLauncher
 
 [Icons]
 Name: "{autoprograms}\HeMiDock"; Filename: "{app}\HeMiDock.exe"
@@ -193,7 +197,8 @@ begin
   Check := 0; Install := 0;
   // HeMi Launcher keeps the dock up to date: the dock itself does not look (it can be switched on in its settings)
   if NotFromLauncher and WizardIsTaskSelected('updates') then Check := 1;
-  if NotFromLauncher and WizardIsTaskSelected('updates\install') then Install := 1;
+  { installing needs looking: only with "Look for new versions" }
+  if NotFromLauncher and WizardIsTaskSelected('updates') and WizardIsTaskSelected('updatesinstall') then Install := 1;
   RegWriteDWordValue(HKCU, 'Software\HeMi\HeMiDock', 'SetupCheckUpdates', Check);
   RegWriteDWordValue(HKCU, 'Software\HeMi\HeMiDock', 'SetupInstallUpdates', Install);
 end;
