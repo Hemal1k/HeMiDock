@@ -80,10 +80,12 @@ Name: "{autoprograms}\HeMiDock"; Filename: "{app}\HeMiDock.exe"
 Name: "{autodesktop}\HeMiDock"; Filename: "{app}\HeMiDock.exe"; Tasks: desktopicon
 
 [Run]
-; the File Explorer items and the start with Windows point to this installation (also after a move from the old folder)
+; the File Explorer items and the start with Windows point to this installation (also after a move from the old folder) –
+; only over an earlier installation: a new one has nothing to point anew, and winget counts any start of the app by its
+; installer as an error (Validation-Shell-Execute)
 ; not waited for: on a PC without the Windows App Runtime (a quiet install that could not add it) the app would wait for an
 ; answer to the question of Windows about it, and Setup would never end
-Filename: "{app}\HeMiDock.exe"; Parameters: "--repair"; Flags: runasoriginaluser nowait runhidden
+Filename: "{app}\HeMiDock.exe"; Parameters: "--repair"; Flags: runasoriginaluser nowait runhidden; Check: WasInstalled
 ; after an interactive installation: offered; after an update (quiet): the dock starts again by itself
 ; (as the user who started the installer – never as administrator after an installation for all users)
 Filename: "{app}\HeMiDock.exe"; Description: "{cm:LaunchAfter}"; Flags: nowait postinstall skipifsilent runasoriginaluser
@@ -115,6 +117,13 @@ var
   // quiet installation (winget) does not start it; /UPDATE (the updater of the dock, HeMi Launcher) always does: the dock
   // ends before the installer gets to look
   WasRunning: Boolean;
+  // HeMiDock was installed before (an update, a repair or a move from the old folder)
+  Upgrade: Boolean;
+
+function WasInstalled: Boolean;
+begin
+  Result := Upgrade;
+end;
 
 function DockWasRunning: Boolean;
 begin
@@ -219,6 +228,8 @@ var
 begin
   Result := '';
   WasRunning := CheckForMutexes('HeMiDock_SingleInstance');
+  Upgrade := RegKeyExists(HKLM, 'Software\Microsoft\Windows\CurrentVersion\Uninstall\HeMiDock_is1')
+    or RegKeyExists(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Uninstall\HeMiDock_is1') or (OldFolder <> '');
   StopOld;
   if FileExists(ExpandConstant('{app}\HeMiDock.exe')) then
   begin
