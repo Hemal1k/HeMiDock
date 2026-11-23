@@ -164,6 +164,23 @@ sealed partial class ControlCenterWindow
             if (_networks.Children.Count == 0) _wifiStatus.Text = L.T("Wi-Fi networks could not be scanned. Location access may be turned off for desktop apps.");
         }
     }
+    string _networksShown;
+    (string Ssid, DateTime At)? _justConnected;
+
+    /// <summary>
+    /// The network as Windows sees it now: the object of an older scan (before a disconnect) was refused with "network not
+    /// available" after seconds of waiting.
+    /// </summary>
+    WiFiAvailableNetwork FreshNetwork(WiFiAvailableNetwork old)
+    {
+        try
+        {
+            return _adapter.NetworkReport.AvailableNetworks.Where(a => a.Ssid == old.Ssid)
+                .OrderByDescending(a => a.NetworkRssiInDecibelMilliwatts).FirstOrDefault() ?? old;
+        }
+        catch { return old; }
+    }
+
     sealed record WifiNetwork(string Ssid, byte Bars, bool Secured, WiFiAvailableNetwork Real, string Details);
 
     /// <summary>
@@ -186,6 +203,9 @@ sealed partial class ControlCenterWindow
 #endif
         {
             connected = await Task.Run(ConnectedSsid);
+            // right after a successful connect Windows reports the connection only a moment later: the network stays shown
+            // as connected for a few seconds (it was shown as not connected, with Connect again – clicked again and again)
+            if (connected == null && _justConnected is { } just && DateTime.UtcNow - just.At < TimeSpan.FromSeconds(10)) connected = just.Ssid;
             available = _adapter.NetworkReport.AvailableNetworks.Where(n => !string.IsNullOrEmpty(n.Ssid)).GroupBy(n => n.Ssid)
                 .Select(g => g.OrderByDescending(n => n.NetworkRssiInDecibelMilliwatts).First())
                 .Select(n => new WifiNetwork(n.Ssid, n.SignalBars, IsSecured(n), n, Describe(n)));
@@ -194,6 +214,11 @@ sealed partial class ControlCenterWindow
         var known = KnownNetworks();
         _wifiStatus.Text = networks.Count == 0 ? L.T("No networks found.") : connected != null ? L.T("Connected to {0}", connected) : L.T("Not connected");
         if (unfolded && !force) return;
+        // the same list again (a scan, a change of the network, a new list of Windows – several in a second after connecting)
+        // is not rebuilt: every rebuild made the list jump
+        string shown = string.Join("|", networks.Select(n => $"{n.Ssid}/{n.Bars}/{n.Ssid == connected}/{known.Contains(n.Ssid)}"));
+        if (shown == _networksShown && !unfolded && _networks.Children.Count == networks.Count) return;
+        _networksShown = shown;
         _networks.Children.Clear();
         foreach (var n in networks) _networks.Children.Add(NetworkRow(n, n.Ssid == connected, known.Contains(n.Ssid)));
         if (_networksCard != null) _networksCard.Visibility = networks.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
@@ -262,6 +287,7 @@ sealed partial class ControlCenterWindow
                 if (Simulation.Wifi) Simulation.WifiConnected = null;
                 else
 #endif
+                _justConnected = null;
                 try { _adapter.Disconnect(); } catch (Exception ex) { Log.Write("Wi-Fi disconnect", ex); }
                 await Task.Delay(800);
                 await BuildNetworksAsync(force: true);
@@ -303,9 +329,10 @@ sealed partial class ControlCenterWindow
 #endif
                     var kind = auto.IsChecked == true ? WiFiReconnectionKind.Automatic : WiFiReconnectionKind.Manual;
                     long started = System.Diagnostics.Stopwatch.GetTimestamp();
-                    var connecting = (password != null && password.Password.Length > 0
-                        ? _adapter.ConnectAsync(n.Real, kind, new PasswordCredential { Password = password.Password })
-                        : _adapter.ConnectAsync(n.Real, kind)).AsTask();
+                    Task<WiFiConnectionResult> Connect(WiFiAvailableNetwork net) => (password != null && password.Password.Length > 0
+                        ? _adapter.ConnectAsync(net, kind, new PasswordCredential { Password = password.Password })
+                        : _adapter.ConnectAsync(net, kind)).AsTask();
+                    var connecting = Connect(FreshNetwork(n.Real));
                     // some drivers never answer a wrong key or a network gone weak: after 25 s the user is told, not left waiting
                     if (await Task.WhenAny(connecting, Task.Delay(25000)) != connecting)
                     {
@@ -315,6 +342,14 @@ sealed partial class ControlCenterWindow
                         return;
                     }
                     var result = await connecting;
+                    if (result.ConnectionStatus == WiFiConnectionStatus.NetworkNotAvailable)
+                    {
+                        // just disconnected: the adapter has to see the network once more – one scan, then again
+                        Diag.Write("Wi-Fi", "connect: network not available – scanning and trying again");
+                        await Task.WhenAny(_adapter.ScanAsync().AsTask(), Task.Delay(6000));
+                        var again = Connect(FreshNetwork(n.Real));
+                        if (await Task.WhenAny(again, Task.Delay(20000)) == again) result = await again;
+                    }
                     Diag.Write("Wi-Fi", $"connect: {result.ConnectionStatus} in {System.Diagnostics.Stopwatch.GetElapsedTime(started).TotalMilliseconds:0} ms");
                     bool ok = result.ConnectionStatus == WiFiConnectionStatus.Success;
                     // refused without a clear reason (some versions of Windows do so for apps): the same through the tool of Windows
@@ -322,7 +357,10 @@ sealed partial class ControlCenterWindow
                         ok = await WifiFallback.ConnectAsync(n.Real, password?.Password, auto.IsChecked == true);
                     switch (ok ? WiFiConnectionStatus.Success : result.ConnectionStatus)
                     {
-                        case WiFiConnectionStatus.Success: await BuildNetworksAsync(force: true); return;
+                        case WiFiConnectionStatus.Success:
+                            _justConnected = (n.Ssid, DateTime.UtcNow);
+                            await BuildNetworksAsync(force: true);
+                            return;
                         case WiFiConnectionStatus.InvalidCredential when password != null && password.Visibility != Visibility.Visible:
                             keyLabel.Visibility = password.Visibility = Visibility.Visible;
                             message.Text = L.T("The saved key no longer works. Enter the network security key.");

@@ -16,6 +16,11 @@ sealed partial class ControlCenterWindow
     DispatcherTimer _btStopTimer;
     bool _btDiscovering;
     StackPanel _btNearbyRows;
+    /// <summary>
+    /// The turning ring of the search: one element for the whole search, shown or hidden – made anew with every device
+    /// found (dozens of LE ones), it started over again and again and looked stuck.
+    /// </summary>
+    StackPanel _btSearchRow;
     string _btPairingId, _btPairNote, _btPairNoteId;
     (string Id, string Pin, TaskCompletionSource<bool> Answer)? _btConfirm;
     bool _btRenderPosted;
@@ -49,15 +54,22 @@ sealed partial class ControlCenterWindow
             {
                 var w = DeviceInformation.CreateWatcher(selector, props, DeviceInformationKind.AssociationEndpoint);
                 w.Added += (_, d) => Ui.Post(() => { if (_btFound == null) return; _btFound[d.Id] = (d, le); RenderNearbySoon(); });
-                w.Updated += (_, u) => Ui.Post(() => { if (_btFound != null && _btFound.TryGetValue(u.Id, out var f)) { f.Info.Update(u); RenderNearbySoon(); } });
+                // updates come all the time (the signal of every device): the list is redrawn only when a name came or changed
+                w.Updated += (_, u) => Ui.Post(() =>
+                {
+                    if (_btFound == null || !_btFound.TryGetValue(u.Id, out var f)) return;
+                    string before = f.Info.Name;
+                    f.Info.Update(u);
+                    if (f.Info.Name != before) RenderNearbySoon();
+                });
                 w.Removed += (_, u) => Ui.Post(() => { if (_btFound != null && u.Id != _btPairingId && _btFound.Remove(u.Id)) RenderNearbySoon(); });
                 _btWatchers.Add(w);
                 w.Start();
             }
         }
         catch (Exception ex) { Log.Write("Bluetooth search", ex); _btDiscovering = false; }
-        // half a minute is enough for a device in pairing mode; the list found stays
-        _btStopTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(30) };
+        // a minute: an iPhone shows itself only while its Bluetooth settings are open; the list found stays
+        _btStopTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(60) };
         _btStopTimer.Tick += (_, _) => { StopBtDiscovery(); RenderNearby(); };
         _btStopTimer.Start();
         Diag.Write("Bluetooth", "search for devices nearby started");
@@ -96,17 +108,20 @@ sealed partial class ControlCenterWindow
         if (_openPage != "bt") { StopBtDiscovery(); return; }
         var rows = _btNearbyRows;
         if (rows == null || _btFound == null) return;
-        rows.Children.Clear();
-        if (_btDiscovering)
-            rows.Children.Add(new StackPanel
+        _btSearchRow ??= new StackPanel
+        {
+            Orientation = Orientation.Horizontal, Spacing = 10, Margin = new Thickness(8, 6, 8, 6),
+            Children =
             {
-                Orientation = Orientation.Horizontal, Spacing = 10, Margin = new Thickness(8, 6, 8, 6),
-                Children =
-                {
-                    new ProgressRing { IsActive = true, Width = 16, Height = 16 },
-                    new TextBlock { Text = L.T("Searching for devices nearby…"), FontSize = 12, VerticalAlignment = VerticalAlignment.Center, Foreground = Res("TextFillColorSecondaryBrush") }
-                }
-            });
+                new ProgressRing { IsActive = true, Width = 16, Height = 16 },
+                new TextBlock { Text = L.T("Searching for devices nearby…"), FontSize = 12, VerticalAlignment = VerticalAlignment.Center, Foreground = Res("TextFillColorSecondaryBrush") }
+            }
+        };
+        // everything but the ring goes; the ring stays where it is (moved between lists only when the page was rebuilt)
+        for (int i = rows.Children.Count - 1; i >= 0; i--) if (rows.Children[i] != _btSearchRow) rows.Children.RemoveAt(i);
+        if (_btSearchRow.Parent is Microsoft.UI.Xaml.Controls.Panel other && other != rows) other.Children.Remove(_btSearchRow);
+        if (_btSearchRow.Parent == null) rows.Children.Insert(0, _btSearchRow);
+        _btSearchRow.Visibility = _btDiscovering ? Visibility.Visible : Visibility.Collapsed;
         // a device seen as classic and as LE once, by its name (the classic one pairs the way Windows does)
         var shown = _btFound.Values.Where(f => !string.IsNullOrWhiteSpace(f.Info.Name))
             .GroupBy(f => f.Info.Name.Trim())
@@ -117,7 +132,7 @@ sealed partial class ControlCenterWindow
         foreach (var f in shown) rows.Children.Add(NearbyRow(f.Info, f.Le));
         if (shown.Count == 0 && !_btDiscovering)
         {
-            rows.Children.Add(new TextBlock { Text = L.T("No devices found. Put the device into pairing mode and search again."), FontSize = 12, Margin = new Thickness(8, 6, 8, 4), TextWrapping = TextWrapping.Wrap, Foreground = Res("TextFillColorSecondaryBrush") });
+            rows.Children.Add(new TextBlock { Text = L.T("No devices found. Put the device into pairing mode (an iPhone: Settings → Bluetooth open) and search again."), FontSize = 12, Margin = new Thickness(8, 6, 8, 4), TextWrapping = TextWrapping.Wrap, Foreground = Res("TextFillColorSecondaryBrush") });
         }
         if (!_btDiscovering && _btPairingId == null) rows.Children.Add(PageRow("", "Search again", false, StartBtDiscovery));
         Place();

@@ -107,7 +107,7 @@ static class L
         ["Looks for devices nearby that are ready to pair"] = "Vyhledá zařízení v okolí připravená ke spárování",
         ["Devices nearby"] = "Zařízení v okolí",
         ["Searching for devices nearby…"] = "Hledání zařízení v okolí…",
-        ["No devices found. Put the device into pairing mode and search again."] = "Nic nenalezeno. Přepněte zařízení do režimu párování a hledejte znovu.",
+        ["No devices found. Put the device into pairing mode (an iPhone: Settings → Bluetooth open) and search again."] = "Nic nenalezeno. Přepněte zařízení do režimu párování (iPhone: otevřené Nastavení → Bluetooth) a hledejte znovu.",
         ["Search again"] = "Hledat znovu",
         ["Pairing…"] = "Párování…",
         ["Pair"] = "Spárovat",
