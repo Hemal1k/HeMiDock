@@ -219,6 +219,9 @@ static class L
         ["{0} h {1} min remaining"] = "zbývá {0} h {1} min",
         ["Wi-Fi is turned off."] = "Wi-Fi je vypnuté.",
         ["Searching for networks…"] = "Hledání sítí…",
+        ["Windows does not allow scanning for Wi-Fi networks: the location is turned off by a policy (often set by a privacy tool). Without it only More Wi-Fi settings can list the networks."] =
+            "Windows nepovoluje hledání sítí Wi-Fi: poloha je vypnutá zásadou (často ji nastaví nástroj na ochranu soukromí). Bez ní sítě vypíše jen Další nastavení Wi-Fi.",
+        ["Click to open the settings of the location."] = "Klepnutím otevřete nastavení polohy.",
         ["Windows does not allow scanning for Wi-Fi networks. Turn on location access for desktop apps (Settings → Privacy & security → Location), or use More Wi-Fi settings."] =
             "Windows nepovoluje hledání sítí Wi-Fi. Zapněte přístup k poloze pro desktopové aplikace (Nastavení → Ochrana osobních údajů a zabezpečení → Poloha), nebo použijte Další nastavení Wi-Fi.",
         ["No Wi-Fi adapter found."] = "Nebyl nalezen adaptér Wi-Fi.",

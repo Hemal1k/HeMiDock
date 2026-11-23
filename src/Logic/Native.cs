@@ -378,7 +378,77 @@ static class AppShell
             result = new IconImage(got.Pixels, got.Width, got.Height);
             if (!IsFramedSmallIcon(result)) break;
         }
+        if (result != null) RemoveStrayDots(result);
         return result;
+    }
+
+    /// <summary>
+    /// Specks around an icon: with other display scaling the frame of a small icon blown up (see above) is too faint to be
+    /// found, and only its corners stay – white dots around the icon (HP Support Assistant on a laptop at 125 %). Small
+    /// groups of pixels apart from the drawing, outside the box of its biggest part, are cleared.
+    /// </summary>
+    static void RemoveStrayDots(IconImage icon)
+    {
+        int w = icon.Width, h = icon.Height;
+        var px = icon.Pixels;
+        if (w < 32 || h < 32 || px.Length < w * h * 4) return;
+        var group = new int[w * h];                      // 0 = not visited / empty, else the number of the group
+        var sizes = new List<int> { 0 };
+        var boxes = new List<(int x0, int y0, int x1, int y1)> { default };
+        var stack = new Stack<int>();
+        for (int start = 0; start < w * h; start++)
+        {
+            if (group[start] != 0 || px[start * 4 + 3] < 16) continue;
+            int id = sizes.Count, count = 0, x0 = w, y0 = h, x1 = 0, y1 = 0;
+            group[start] = id;
+            stack.Push(start);
+            while (stack.Count > 0)
+            {
+                int i = stack.Pop(), x = i % w, y = i / w;
+                count++;
+                x0 = Math.Min(x0, x); x1 = Math.Max(x1, x); y0 = Math.Min(y0, y); y1 = Math.Max(y1, y);
+                for (int dy = -1; dy <= 1; dy++)
+                    for (int dx = -1; dx <= 1; dx++)
+                    {
+                        int nx = x + dx, ny = y + dy;
+                        if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+                        int n = ny * w + nx;
+                        if (group[n] == 0 && px[n * 4 + 3] >= 16) { group[n] = id; stack.Push(n); }
+                    }
+            }
+            sizes.Add(count);
+            boxes.Add((x0, y0, x1, y1));
+        }
+        if (sizes.Count <= 2) return;                    // one part only: nothing apart from it
+        int main = 1;
+        for (int g = 2; g < sizes.Count; g++) if (sizes[g] > sizes[main]) main = g;
+        var box = boxes[main];
+        int small = Math.Max(4, w * h / 1000);
+        var clear = new bool[sizes.Count];
+        for (int g = 1; g < sizes.Count; g++)
+        {
+            var b = boxes[g];
+            bool outside = b.x1 < box.x0 || b.x0 > box.x1 || b.y1 < box.y0 || b.y0 > box.y1
+                || (b.x1 < box.x0 + w / 8 || b.x0 > box.x1 - w / 8) && (b.y1 < box.y0 + h / 8 || b.y0 > box.y1 - h / 8);  // in a corner of the box
+            clear[g] = g != main && sizes[g] <= small && outside;
+        }
+        for (int i = 0; i < w * h; i++)
+        {
+            // the faint edge around a cleared speck goes with it
+            if (group[i] != 0 && clear[group[i]]) { px[i * 4] = px[i * 4 + 1] = px[i * 4 + 2] = px[i * 4 + 3] = 0; continue; }
+            if (group[i] == 0 && px[i * 4 + 3] != 0)
+            {
+                int x = i % w, y = i / w;
+                bool nearCleared = false;
+                for (int dy = -1; dy <= 1 && !nearCleared; dy++)
+                    for (int dx = -1; dx <= 1; dx++)
+                    {
+                        int nx = x + dx, ny = y + dy;
+                        if (nx >= 0 && ny >= 0 && nx < w && ny < h && group[ny * w + nx] != 0 && clear[group[ny * w + nx]]) { nearCleared = true; break; }
+                    }
+                if (nearCleared) px[i * 4] = px[i * 4 + 1] = px[i * 4 + 2] = px[i * 4 + 3] = 0;
+            }
+        }
     }
 
     /// <summary>

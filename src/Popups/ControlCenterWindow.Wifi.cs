@@ -52,6 +52,19 @@ sealed partial class ControlCenterWindow
     Task _scanning;
     static bool _adapterWatched;
 
+    void OpenLocationSettings(object sender, Microsoft.UI.Xaml.Input.TappedRoutedEventArgs e) => Open("ms-settings:privacy-location");
+
+    /// <summary>The location turned off by a policy of the PC (LocationAndSensors\DisableLocation).</summary>
+    static bool LocationOffByPolicy()
+    {
+        try
+        {
+            using var k = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Policies\Microsoft\Windows\LocationAndSensors");
+            return k?.GetValue("DisableLocation") is int v && v != 0;
+        }
+        catch { return false; }
+    }
+
     /// <summary>
     /// The Wi-Fi adapter, asked for once – only when the Wi-Fi page is opened: asking for it can bring up a message of Windows
     /// (location turned off by the administrator), which must not come by itself.
@@ -61,9 +74,20 @@ sealed partial class ControlCenterWindow
         if (_adapter != null) return true;
         if (await WiFiAdapter.RequestAccessAsync() != WiFiAccessStatus.Allowed)
         {
-            _wifiStatus.Text = L.T("Windows does not allow scanning for Wi-Fi networks. Turn on location access for desktop apps (Settings → Privacy & security → Location), or use More Wi-Fi settings.");
+            // since Windows 11 24H2 the list of networks needs the location: a policy that turns it off (often set by
+            // privacy tools) cannot be switched on in Settings, so it is named
+            _wifiStatus.Tapped -= OpenLocationSettings;
+            if (LocationOffByPolicy())
+                _wifiStatus.Text = L.T("Windows does not allow scanning for Wi-Fi networks: the location is turned off by a policy (often set by a privacy tool). Without it only More Wi-Fi settings can list the networks.");
+            else
+            {
+                _wifiStatus.Text = L.T("Windows does not allow scanning for Wi-Fi networks. Turn on location access for desktop apps (Settings → Privacy & security → Location), or use More Wi-Fi settings.")
+                    + " " + L.T("Click to open the settings of the location.");
+                _wifiStatus.Tapped += OpenLocationSettings;
+            }
             return false;
         }
+        _wifiStatus.Tapped -= OpenLocationSettings;
         _adapter ??= (await WiFiAdapter.FindAllAdaptersAsync()).FirstOrDefault();
         if (_adapter == null) { _wifiStatus.Text = L.T("No Wi-Fi adapter found."); return false; }
         if (!_adapterWatched)
