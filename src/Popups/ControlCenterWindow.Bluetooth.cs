@@ -42,6 +42,7 @@ sealed partial class ControlCenterWindow
         Footer("More Bluetooth settings", "ms-settings:bluetooth");
         if (!on)
         {
+            StopBtDiscovery();
             _page.Children.Clear();
             Note(_bt == null ? "No Bluetooth adapter found." : "Bluetooth is turned off.");
             return;
@@ -74,11 +75,12 @@ sealed partial class ControlCenterWindow
         if (_openPage != "bt" || build != _btBuild) return;
         _page.Children.Clear();
         Diag.Write("Bluetooth", $"{devices.Count} devices ({devices.Count(d => d.Connected)} connected) in {System.Diagnostics.Stopwatch.GetElapsedTime(started).TotalMilliseconds:0} ms");
-        if (devices.Count == 0) { Note("No paired devices."); return; }
-        var card = PageCard();
+        if (devices.Count == 0) Note("No paired devices.");
+        var card = devices.Count == 0 ? null : PageCard();
         foreach (var d in devices.OrderByDescending(d => d.Connected).ThenBy(d => d.Name))
             card.Children.Add(PageRow("", d.Name, d.Connected, () => ConnectBluetooth(d.Id, d.Connected),
                 L.T(d.Connected ? "Connected" : "Paired") + (d.Battery is { } percent ? $" · {L.T("Battery")} {percent} %" : "")));
+        AddNearbySection();                                              // "Add device" or the devices found nearby
         Place();
     }
 

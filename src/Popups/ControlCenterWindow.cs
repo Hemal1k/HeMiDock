@@ -119,7 +119,7 @@ sealed partial class ControlCenterWindow : PopupWindow
         OpenRequested();
     }
 
-    protected override void Hidden() { _poll.Stop(); _visibleNow = false; }
+    protected override void Hidden() { _poll.Stop(); _visibleNow = false; ResetBtDiscovery(); }
 
     protected override bool OnEscape()
     {
