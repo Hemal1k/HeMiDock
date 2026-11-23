@@ -327,7 +327,7 @@ sealed partial class ControlCenterWindow : PopupWindow
         (string Glyph, string Name, string State, bool On, Action Click, string Page)? t = id switch
         {
             "net" => _wifi != null
-                ? ("", "Wi-Fi", _wifi.State == RadioState.On ? (net.Connected ? net.Tip.Replace("Wi-Fi: ", "") : L.T("Not connected")) : L.T("Off"), _wifi.State == RadioState.On, async () => { await _wifi.SetStateAsync(_wifi.State == RadioState.On ? RadioState.Off : RadioState.On); }, "wifi")
+                ? ("", "Wi-Fi", _wifi.State == RadioState.On ? (ConnectedSsid() ?? L.T("Not connected")) : L.T("Off"), _wifi.State == RadioState.On, async () => { await _wifi.SetStateAsync(_wifi.State == RadioState.On ? RadioState.Off : RadioState.On); }, "wifi")
                 : (net.Glyph, L.T("Network"), net.Connected ? net.Tip : L.T("Not connected"), net.Connected, () => Open("ms-settings:network"), null),
             "bt" when _bt != null && DockSettings.Current.ShowBluetooth => ("", L.T("Bluetooth"), _bt.State != RadioState.On ? L.T("Off") : MainBluetoothNames() ?? L.T("On"), _bt.State == RadioState.On, async () => { await _bt.SetStateAsync(_bt.State == RadioState.On ? RadioState.Off : RadioState.On); }, "bt"),
             // mobile data of a SIM / eSIM: on / off; its settings (operator, eSIM profiles) by the right button

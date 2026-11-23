@@ -185,7 +185,7 @@ sealed partial class ControlCenterWindow
         else
 #endif
         {
-            try { connected = (await _adapter.NetworkAdapter.GetConnectedProfileAsync())?.ProfileName; } catch { }
+            connected = await Task.Run(ConnectedSsid);
             available = _adapter.NetworkReport.AvailableNetworks.Where(n => !string.IsNullOrEmpty(n.Ssid)).GroupBy(n => n.Ssid)
                 .Select(g => g.OrderByDescending(n => n.NetworkRssiInDecibelMilliwatts).First())
                 .Select(n => new WifiNetwork(n.Ssid, n.SignalBars, IsSecured(n), n, Describe(n)));
@@ -218,6 +218,25 @@ sealed partial class ControlCenterWindow
             "Wpa3" or "Wpa3Enterprise" or "Wpa3Enterprise192Bits" => "WPA3-Enterprise", "Owe" => "Enhanced Open", "SharedKey80211" => "WEP", _ => L.T("open")
         };
         return phy == null ? security : phy + ", " + security;
+    }
+
+    /// <summary>
+    /// The Wi-Fi network this PC is connected to (its name), null when none. Not GetConnectedProfileAsync of the adapter: with
+    /// a cable plugged in too, Windows hands the profile of the Ethernet there ("Connected to Ethernet" on the Wi-Fi page).
+    /// </summary>
+    internal static string ConnectedSsid()
+    {
+        try
+        {
+            foreach (var p in NetworkInformation.GetConnectionProfiles())
+            {
+                if (!p.IsWlanConnectionProfile || p.GetNetworkConnectivityLevel() == NetworkConnectivityLevel.None) continue;
+                string ssid = p.WlanConnectionProfileDetails?.GetConnectedSsid();
+                if (!string.IsNullOrEmpty(ssid)) return ssid;
+            }
+        }
+        catch { }
+        return null;
     }
 
     /// <summary>Networks Windows has a saved profile of: they connect without asking for the key.</summary>
