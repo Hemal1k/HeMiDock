@@ -285,7 +285,7 @@ sealed partial class ControlCenterWindow
         var details = new StackPanel { Margin = new Thickness(36, 6, 6, 6), Spacing = 6, Visibility = Visibility.Collapsed };
         var message = new TextBlock { FontSize = 12, TextWrapping = TextWrapping.Wrap, Foreground = Res("TextFillColorSecondaryBrush"), Visibility = Visibility.Collapsed };
         var header = DeviceRow(SignalGlyph(n.Bars), n.Ssid, connected, () => details.Visibility = details.Visibility == Visibility.Visible ? Visibility.Collapsed : Visibility.Visible,
-            (connected ? L.T("Connected") + " · " : "") + n.Details, n.Secured ? "" : null, "");
+            n.Details /* "Connected" is the heading above it */, n.Secured ? "" : null, "");
         if (connected)
         {
             var disconnect = new Button { Content = L.T("Disconnect"), HorizontalAlignment = HorizontalAlignment.Right };
