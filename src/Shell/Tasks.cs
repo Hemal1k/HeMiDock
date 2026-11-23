@@ -93,10 +93,38 @@ static class DockModel
             // a packaged app (shown by its app id) pinned earlier by its program in WindowsApps: still its pin
             if (entry == null && exe.StartsWith("shell:", StringComparison.OrdinalIgnoreCase) && Win32.ProcessPath(w.ProcessId) is { } program)
                 entry = entries.FirstOrDefault(e => string.Equals(e.ExePath, program, StringComparison.OrdinalIgnoreCase));
+            // the question of Windows for administrator rights (consent.exe) had a plain icon: the shield of User Account Control
+            if (entry == null && exe.EndsWith(@"\consent.exe", StringComparison.OrdinalIgnoreCase))
+                entries.Add(entry = new DockEntry { Name = L.T("Administrator rights"), IconPath = UacIcon, ExePath = exe });
             if (entry == null) entries.Add(entry = new DockEntry { Name = NameOf(exe), IconPath = exe, ExePath = exe });
             entry.Windows.Add(w);
         }
+        // the running apps that are not pinned in the order the user dragged them to (the rest after them, as they came)
+        if (RunningOrder.Count > 0)
+        {
+            int pinned = entries.FindIndex(e => e.Pin == null);
+            if (pinned >= 0)
+            {
+                var running = entries.Skip(pinned).OrderBy(e => RunningOrder.FindIndex(x => string.Equals(x, e.ExePath, StringComparison.OrdinalIgnoreCase)) is var i && i >= 0 ? i : int.MaxValue).ToList();
+                entries.RemoveRange(pinned, entries.Count - pinned);
+                entries.AddRange(running);
+            }
+        }
         return entries;
+    }
+
+    /// <summary>The order of the running apps that are not pinned, as the user dragged them (their programs; for this run).</summary>
+    static readonly List<string> RunningOrder = new();
+
+    /// <summary>A running app that is not pinned dragged to another place among them (<paramref name="shown"/>: their programs now).</summary>
+    public static void MoveRunning(IReadOnlyList<string> shown, string exe, int index)
+    {
+        var order = shown.Where(x => !string.Equals(x, exe, StringComparison.OrdinalIgnoreCase)).ToList();
+        int from = shown.ToList().FindIndex(x => string.Equals(x, exe, StringComparison.OrdinalIgnoreCase));
+        if (from >= 0 && from < index) index--;
+        order.Insert(Math.Clamp(index, 0, order.Count), exe);
+        RunningOrder.Clear();
+        RunningOrder.AddRange(order);
     }
 
     [System.Runtime.InteropServices.DllImport("ntdll.dll")]
@@ -163,6 +191,9 @@ static class DockModel
     /// The description of a program ("Visual Studio Code"), else its file name – remembered: reading it from the file took
     /// tens of milliseconds whenever the windows changed (a title, a new window).
     /// </summary>
+    /// <summary>A program with the shield of User Account Control as its icon.</summary>
+    static readonly string UacIcon = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "UserAccountControlSettings.exe");
+
     static string NameOf(string exe)
     {
         if (Names.TryGetValue(exe, out var known)) return known;

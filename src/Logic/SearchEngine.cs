@@ -85,6 +85,8 @@ static class SearchEngine
         new("Default apps", "default browser file types", "ms-settings:defaultapps"),
         new("Startup apps", "autostart run at login", "ms-settings:startupapps"),
         new("Optional features", "windows features", "ms-settings:optionalfeatures"),
+        // the page with the app execution aliases (Apps → Advanced app settings) – "alias" found nothing (the user, 2026-11-23)
+        new("App execution aliases", "alias aliases aliasy advanced app settings rozšířené nastavení aplikací spouštění", "ms-settings:advanced-apps"),
         new("Accounts", "your info profile user", "ms-settings:yourinfo"),
         new("Sign-in options", "password pin windows hello fingerprint", "ms-settings:signinoptions"),
         new("Email & accounts", "mail accounts", "ms-settings:emailandaccounts"),

@@ -186,6 +186,27 @@ sealed partial class ControlCenterWindow
         var (prev, play, next) = (B("", BarMedia.PreviousAsync), B(playing ? "" : "", BarMedia.PlayPauseAsync), B("", BarMedia.NextAsync));
         foreach (var (b, i) in new[] { (prev, 0), (play, 1), (next, 2) }) { b.HorizontalAlignment = HorizontalAlignment.Center; Grid.SetColumn(b, i); buttons.Children.Add(b); }
         var row = new StackPanel { Spacing = 4, Children = { top, TimeBar(), buttons } };
+        // more players at once (YouTube and Spotify): each as a small button, the one shown marked; a click shows that one
+        BarMedia.Relist();
+        var players = BarMedia.Players;
+        if (players.Count > 1)
+        {
+            var list = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, Margin = new Thickness(0, 6, 0, 0) };
+            for (int i = 0; i < players.Count; i++)
+            {
+                var pl = players[i];
+                int at = i;
+                var content = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
+                if (pl.AppKey is { } k && AppShell.Icon(k) is { } ic) content.Children.Add(new Image { Width = 14, Height = 14, Source = Pictures.ForSize(ic, 16) });
+                content.Children.Add(new TextBlock { Text = pl.App ?? "?", FontSize = 12, MaxWidth = 120, TextTrimming = TextTrimming.CharacterEllipsis, FontWeight = pl.Shown ? Microsoft.UI.Text.FontWeights.SemiBold : Microsoft.UI.Text.FontWeights.Normal });
+                if (pl.Playing) content.Children.Add(new FontIcon { Glyph = "", FontSize = 11, Foreground = Res("AccentTextFillColorPrimaryBrush") });
+                var b = new Button { Style = DockButton, Padding = new Thickness(8, 4, 8, 4), Content = content, Background = pl.Shown ? Res("ControlFillColorSecondaryBrush") : null };
+                ToolTipService.SetToolTip(b, pl.Playing ? L.T("{0} – plays", pl.App) : pl.App);
+                b.Click += async (_, _) => { BarMedia.Select(at); await Task.Delay(250); BuildMain(); };
+                list.Children.Add(b);
+            }
+            row.Children.Add(new ScrollViewer { HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, VerticalScrollBarVisibility = ScrollBarVisibility.Disabled, HorizontalScrollMode = ScrollMode.Auto, Content = list });
+        }
         return Card(row);
     }
 

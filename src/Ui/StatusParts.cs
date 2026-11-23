@@ -327,14 +327,17 @@ sealed class StatusParts
             return;
         }
         var release = Updater.Available;
-        _appUpdate.Visibility = V(release != null);
-        if (release != null) ToolTipService.SetToolTip(_appUpdate, L.T("HeMiDock {0} is available.", release.Version.ToString(3)) + "\n" + L.T("Click: install"));
+        _appUpdate.Visibility = V(release != null || Updater.Busy != null);
+        // while it downloads / installs: how far it is
+        if (Updater.Busy is { } busy) ToolTipService.SetToolTip(_appUpdate, busy);
+        else if (release != null) ToolTipService.SetToolTip(_appUpdate, L.T("HeMiDock {0} is available.", release.Version.ToString(3)) + "\n" + L.T("Click: install"));
     }
 
     /// <summary>The menu of the sign of a new version: install it (or download it, portable), see what is new, skip it.</summary>
     static void AppUpdateMenu(FrameworkElement at)
     {
         if (HeMiLauncher.Present) { HeMiLauncher.Open(); return; }               // HeMi Launcher shows and installs them
+        if (Updater.Busy != null) return;                                      // downloading or installing already
         if (Updater.Available is not { } release) return;
         var menu = new MenuFlyout();
         void Add(string text, Action click, bool bold = false)

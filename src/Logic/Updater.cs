@@ -173,16 +173,31 @@ static class Updater
     {
         string mode = InstalledFor;
         if (mode == null || release.SetupUrl == null || release.SumsUrl == null) { Fg.Open(release.Page); return; }
+        if (Busy != null) return;                                        // already downloading
+        string v = release.Version.ToString(3);
         try
         {
-            Host.ShowInfo?.Invoke(L.T("Downloading HeMiDock {0}…", release.Version.ToString(3)));
-            string file = Path.Combine(Path.GetTempPath(), $"HeMiDock-Setup-{release.Version.ToString(3)}.exe");
+            Host.ShowInfo?.Invoke(L.T("Downloading HeMiDock {0}…", v));
+            SetBusy(L.T("Downloading HeMiDock {0}…", v));
+            string file = Path.Combine(Path.GetTempPath(), $"HeMiDock-Setup-{v}.exe");
             using (var response = await Http.GetAsync(release.SetupUrl, HttpCompletionOption.ResponseHeadersRead))
             {
                 response.EnsureSuccessStatusCode();
+                long total = response.Content.Headers.ContentLength ?? 0, done = 0;
+                int shown = -1;
+                await using var from = await response.Content.ReadAsStreamAsync();
                 await using var to = File.Create(file);
-                await response.Content.CopyToAsync(to);
+                var buffer = new byte[81920];
+                for (int n; (n = await from.ReadAsync(buffer)) > 0;)
+                {
+                    await to.WriteAsync(buffer.AsMemory(0, n));
+                    done += n;
+                    // the progress on the sign of the new version and in the settings (each whole percent)
+                    int percent = total > 0 ? (int)(done * 100 / total) : -1;
+                    if (percent != shown) { shown = percent; SetBusy(percent >= 0 ? L.T("Downloading HeMiDock {0} – {1} %", v, percent) : L.T("Downloading HeMiDock {0}…", v)); }
+                }
             }
+            SetBusy(L.T("Installing HeMiDock {0}…", v));
             // the installer runs only when it is exactly the file of the release (SHA256SUMS.txt of the same release)
             string sums = await Http.GetStringAsync(release.SumsUrl);
             string want = sums.Split('\n').Select(l => l.Trim().Split((char[])null, 2, StringSplitOptions.RemoveEmptyEntries))
@@ -194,16 +209,23 @@ static class Updater
                 File.Delete(file);
                 throw new InvalidDataException($"{SetupAsset}: the checksum does not match");
             }
-            // for all users the installer asks for administrator rights itself (UAC); for the user it runs without them
-            Process.Start(new ProcessStartInfo(file, $"/SILENT /SUPPRESSMSGBOXES /NORESTART /UPDATE {mode}") { UseShellExecute = true });
+            // quietly, without its window (the user, 2026-11-23); for all users the installer asks for administrator rights
+            // itself (UAC), for the user it runs without them
+            Process.Start(new ProcessStartInfo(file, $"/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /UPDATE {mode}") { UseShellExecute = true });
             App.Quit();                                                  // the installer replaces the files and starts the dock again
         }
         catch (Exception ex)
         {
             Log.Write("Update install", ex);
+            SetBusy(null);
             Fg.Open(release.Page);                                      // the download failed: the page instead
         }
     }
+
+    /// <summary>What the update does now ("Downloading HeMiDock 1.9.7 – 45 %"), null when nothing.</summary>
+    public static string Busy { get; private set; }
+
+    static void SetBusy(string text) => Ui.Post(() => { Busy = text; Changed?.Invoke(); });
 }
 
 /// <summary>

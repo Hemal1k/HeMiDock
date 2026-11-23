@@ -40,7 +40,7 @@ sealed partial class DockWindow
                     if (e.IconPath != null) _launching.Remove(e.IconPath);
                     if (e.Pin?.Path != null) _launching.Remove(e.Pin.Path);
                 }
-        string shown = string.Join("|", _entries.Select(e => e.IsGap ? (e.Pin.Line ? "L" : "S") : $"{e.IconPath}:{e.Pin?.IconPath}:{e.Name}:{e.Windows.Count}:{e.Windows.Any(w => w.Active)}:{e.Windows.Any(w => w.Flashing)}:{e.Windows.Select(w => w.Progress).DefaultIfEmpty(-1).Max():0.00}:{e.Windows.Any(w => w.Overlay != null)}:{_launching.Contains(e.ExePath ?? "")}"))
+        string shown = string.Join("|", _entries.Select(e => e.IsGap ? (e.Pin.Line ? "L" : "S") : $"{e.IconPath}:{e.Pin?.IconPath}:{e.Name}:{e.Windows.Count}:{e.Windows.Any(w => w.Active)}:{e.Windows.Any(w => w.Flashing)}:{e.Windows.Any(w => w.Progress >= 0)}:{e.Windows.Any(w => w.Overlay != null)}:{_launching.Contains(e.ExePath ?? "")}"))
             + $"|{S.ShowRunningIndicator}{S.ShowAppNames}{S.DockEditMode}{UnreadMail.HasMail}{_layoutShown}";
         if (shown != _shown)
         {
@@ -49,6 +49,7 @@ sealed partial class DockWindow
             var oldViews = Apps.Children.OfType<FrameworkElement>().ToList();
             var oldOrder = oldViews.Select(c => c.Tag is DockEntry { IsGap: false } de ? KeyOf(de) : c.Tag is string closingKey && closingKey.StartsWith("closing:") ? closingKey[8..] : null).ToList();
             Apps.Children.Clear();
+            _progress.Clear();
             // an app new in the dock opens its place from nothing and grows in; the dock follows the width of its content
             // frame by frame (it widened first and cut the icons at both ends, then jumped)
             var before = _iconKeys;
@@ -78,6 +79,12 @@ sealed partial class DockWindow
                     }
             BounceFlashing();
         }
+        else
+            // only the progress moved (copying files): the bars of the icons follow – the whole dock was built again at every
+            // percent and blinked (the user, 2026-11-23)
+            foreach (var e in _entries)
+                if (!e.IsGap && _progress.TryGetValue(KeyOf(e), out var bar))
+                    bar.Value = Math.Max(0, e.Windows.Select(w => w.Progress).DefaultIfEmpty(-1).Max()) * 100;
         if (PreviewWindow.Shown is { } open)
         {
             var now = _entries.FirstOrDefault(e => e.ExePath != null && string.Equals(e.ExePath, open.ExePath, StringComparison.OrdinalIgnoreCase));
@@ -93,6 +100,9 @@ sealed partial class DockWindow
 
     HashSet<string> _iconKeys;
     static string KeyOf(DockEntry e) => e.ExePath ?? e.IconPath ?? e.Name ?? "";
+
+    /// <summary>The progress bars of the icons by their key (their values are moved without building the dock again).</summary>
+    readonly Dictionary<string, ProgressBar> _progress = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>The place of an icon opening (a new app) or closing (an app gone), frame by frame.</summary>
     sealed class Slide { public FrameworkElement El; public bool Closing; public double Start; public bool Drawn; }
@@ -230,7 +240,11 @@ sealed partial class DockWindow
         double progress = entry.Windows.Select(w => w.Progress).DefaultIfEmpty(-1).Max();
         FrameworkElement mark = null;
         if (progress >= 0)
-            mark = new ProgressBar { Value = progress * 100, Maximum = 100, Width = Vertical ? double.NaN : px, MinHeight = 3, Height = Vertical ? px : double.NaN, MinWidth = Vertical ? 3 : 0 };
+        {
+            var bar = new ProgressBar { Value = progress * 100, Maximum = 100, Width = Vertical ? double.NaN : px, MinHeight = 3, Height = Vertical ? px : double.NaN, MinWidth = Vertical ? 3 : 0 };
+            _progress[KeyOf(entry)] = bar;                               // its value follows without building the dock again
+            mark = bar;
+        }
         else if (S.ShowRunningIndicator && (entry.IsRunning || _launching.Contains(entry.ExePath ?? "")))
         {
             bool active = entry.Windows.Any(w => w.Active);

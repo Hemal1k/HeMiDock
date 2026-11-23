@@ -82,7 +82,7 @@ sealed partial class ControlCenterWindow : PopupWindow
         Action media = () => Ui.Post(() =>
         {
             var d = BarMedia.Details;
-            string now = d == null ? null : $"{d.Title}|{d.Artist}|{d.App}|{d.Playing}|{d.Picture?.Length}";
+            string now = d == null ? null : $"{d.Title}|{d.Artist}|{d.App}|{d.Playing}|{d.Picture?.Length}|{string.Join(",", BarMedia.Players.Select(p => p.App + p.Playing + p.Shown))}";
             if (now == mediaShown) return;
             mediaShown = now;
             if (_visibleNow && _openPage == null && !_editing) BuildMain();
@@ -352,7 +352,8 @@ sealed partial class ControlCenterWindow : PopupWindow
             Grid.SetColumn(arrow, 2);
             row.Children.Add(arrow);
         }
-        var button = new Button { HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Stretch, VerticalAlignment = VerticalAlignment.Stretch, VerticalContentAlignment = VerticalAlignment.Center, Padding = new Thickness(10, 8, 6, 8), Content = row };
+        // 10 on the right: with 6 the arrow of Wi-Fi / Bluetooth was cut off at 125 % (the user, 2026-11-23)
+        var button = new Button { HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Stretch, VerticalAlignment = VerticalAlignment.Stretch, VerticalContentAlignment = VerticalAlignment.Center, Padding = new Thickness(10, 8, 10, 8), Content = row };
         button.Click += (_, _) => tile.Click();
         if (id == "net") button.RightTapped += (_, e) => { e.Handled = true; Open(_wifi != null ? "ms-settings:network-wifi" : "ms-settings:network"); };
         if (id == "bt") button.RightTapped += (_, e) => { e.Handled = true; Open("ms-settings:bluetooth"); };

@@ -90,6 +90,37 @@ static class ShellHost
         _shell = null;
     }
 
+    static readonly Dictionary<IntPtr, (double Value, long At)> LastProgress = new();
+
+    /// <summary>
+    /// The progress of a window, steady: File Explorer ends it for a moment between the files it copies or moves, and the bar
+    /// went and came back (blinked) – a gap under 2 s keeps the last value.
+    /// </summary>
+    static double Steady(IntPtr window, double progress)
+    {
+        long now = Environment.TickCount64;
+        if (progress >= 0) { LastProgress[window] = (progress, now); return progress; }
+        if (LastProgress.TryGetValue(window, out var last))
+        {
+            if (now - last.At < 2000) { RecheckLater(); return last.Value; }
+            LastProgress.Remove(window);
+        }
+        return -1;
+    }
+
+    static bool _recheck;
+
+    /// <summary>A kept progress ends after 2 s even when no other change comes: the dock asks once more then.</summary>
+    static async void RecheckLater()
+    {
+        if (_recheck) return;
+        _recheck = true;
+        await Task.Delay(2100);
+        _recheck = false;
+        WindowsChanged?.Invoke();
+    }
+
+
     static uint ProcessOf(IntPtr window) { Win32.GetWindowThreadProcessId(window, out uint pid); return pid; }
 
     static IEnumerable<ApplicationWindow> Windows() =>
@@ -136,7 +167,7 @@ static class ShellHost
         {
             AppId = x.Aumid,
             Overlay = ToImage(x.Window.OverlayIcon),
-            Progress = (int)x.Window.ProgressState == 0 ? -1 : x.Window.ProgressValue / 100.0,
+            Progress = Steady(x.Window.Handle, (int)x.Window.ProgressState == 0 ? -1 : x.Window.ProgressValue / 100.0),
             Flashing = x.Window.State == ApplicationWindow.WindowState.Flashing,
             Active = x.Window.State == ApplicationWindow.WindowState.Active
         }).ToList();

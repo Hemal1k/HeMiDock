@@ -9,7 +9,7 @@ static class Looks
         ("Classic", s =>
         {
             s.TopBar = false; s.DockPosition = 0; s.DockFull = 1; s.BottomMargin = 0; s.StartLayout = 1; s.HoverEffect = 1;
-            s.IconSize = 34; s.IconSpacing = 10; s.ShowSeparators = true; s.ShowSearchButtons = false; s.ShowTaskViewButton = false; s.ShowDesktopButton = true;
+            s.IconSize = 34; s.IconSpacing = 10; s.ShowSeparators = false; s.ShowSearchButtons = false; s.ShowTaskViewButton = false; s.ShowDesktopButton = true;
         }, false, 1, 1),
         ("Modern", s =>
         {

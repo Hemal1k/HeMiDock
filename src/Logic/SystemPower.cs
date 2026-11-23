@@ -70,29 +70,11 @@ static class SystemPower
     public static bool ShuttingDown => GetSystemMetrics(0x2000) != 0;
 
     /// <summary>
-    /// "Update and restart" the way of Windows Update: "Restart now" in its Settings is done by MoNotificationUx.exe (the
-    /// restart log of Windows names it) – it finishes also the updates the update service keeps "pending restart" (a driver),
-    /// which a restart with the install flag left waiting (UsoClient RestartDevice did nothing). When Windows has not begun to
-    /// go down within 4 s, the restart of the dock right away.
+    /// "Update and restart": at once, with the flag to install the updates – announced to the update orchestrator first
+    /// (AnnounceToUpdates), which also finishes what waits for a restart. It used to start MoNotificationUx of Windows Update
+    /// and wait up to 4 s for Windows to go down (the user, 2026-11-23: no waiting).
     /// </summary>
-    public static async void UpdateAndRestart()
-    {
-        Watchdog.MarkClean();                                            // the watchdog must not start the dock again meanwhile
-        try
-        {
-            string ux = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), @"uus\AMD64\MoNotificationUx.exe");
-            if (File.Exists(ux))
-            {
-                Log.Note("Shut down", "MoNotificationUx RebootWithUX");
-                Fg.Run(ux, "RebootWithUX");
-                for (int i = 0; i < 16 && !ShuttingDown; i++) await Task.Delay(250);
-                if (ShuttingDown) return;
-                Log.Note("Shut down", "MoNotificationUx did not restart; restart with the install flag");
-            }
-        }
-        catch (Exception ex) { Log.Write("Shut down: MoNotificationUx", ex); }
-        ShutDown(restart: true, update: true);
-    }
+    public static void UpdateAndRestart() => ShutDown(restart: true, update: true);
 
     [DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     static extern uint InitiateShutdown(string machine, string message, uint grace, uint flags, uint reason);

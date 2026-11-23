@@ -305,7 +305,9 @@ sealed partial class DockWindow
     /// </summary>
     void PressPin(DockEntry entry, Button button, PointerRoutedEventArgs e)
     {
-        if (entry.Pin == null || !e.GetCurrentPoint(button).Properties.IsLeftButtonPressed || !Native.GetCursorPos(out var from)) return;
+        // a running app that is not pinned moves among those (the user, 2026-11-23: they could not be moved)
+        bool pinned = entry.Pin != null;
+        if ((!pinned && !entry.IsRunning) || !e.GetCurrentPoint(button).Properties.IsLeftButtonPressed || !Native.GetCursorPos(out var from)) return;
         if (S.DockEditMode && AtInnerEdge(e.GetCurrentPoint(Root).Position)) return;   // the size of the dock is dragged there
         var follow = QueueTimer.Create();
         follow.Interval = TimeSpan.FromMilliseconds(12);
@@ -320,11 +322,11 @@ sealed partial class DockWindow
                 ResetMagnification();
                 PreviewWindow.HideNow();
                 button.Opacity = 0.3;
-                bool isFile = entry.Pin.AppId == null;
+                bool isFile = pinned && entry.Pin.AppId == null;
                 var picture = isFile ? AppShell.FileTypeIcon(entry.IconPath) : AppShell.Icon(entry.IconPath);
                 DragGhost.Show(picture, (int)Math.Round(IconPx * Scale), now.X, now.Y);
             }
-            if (dragging) { DragGhost.Move(now.X, now.Y); ShowPinPlace(now); }
+            if (dragging) { DragGhost.Move(now.X, now.Y); ShowPinPlace(now, pinned); }
             if (down) return;
             follow.Stop();
             if (!dragging) return;                                        // a click: the button opens the app itself
@@ -332,7 +334,17 @@ sealed partial class DockWindow
             Marker.Hide();
             button.Opacity = 1;
             var bin = ScreenRect(BinButton);
-            if (BinButton.Visibility == Visibility.Visible && now.X >= bin.Left && now.X < bin.Right && now.Y >= bin.Top && now.Y < bin.Bottom)
+            if (!pinned)
+            {
+                if (PinPlace(now, pinned: false) is { } at)
+                {
+                    var shown = Apps.Children.OfType<FrameworkElement>().Select(c => c.Tag).OfType<DockEntry>().Where(d => d.Pin == null && d.ExePath != null).Select(d => d.ExePath).ToList();
+                    DockModel.MoveRunning(shown, entry.ExePath, at.Index);
+                    _shown = null;
+                    Later();
+                }
+            }
+            else if (BinButton.Visibility == Visibility.Visible && now.X >= bin.Left && now.X < bin.Right && now.Y >= bin.Top && now.Y < bin.Bottom)
                 EditPins(p => p.Remove(entry.Pin));                       // onto the Recycle Bin: unpinned
             else if (PinPlace(now) is { } place) MovePin(entry.Pin, place.Index);
             DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () => _pinDragged = false);   // after the click it would have been
@@ -341,7 +353,7 @@ sealed partial class DockWindow
     }
 
     /// <summary>The new place of a dragged pin at a screen point: how many pins go before it, and where the line goes.</summary>
-    (int Index, Native.RECT Mark)? PinPlace(Native.POINT p)
+    (int Index, Native.RECT Mark)? PinPlace(Native.POINT p, bool pinned = true)
     {
         var dock = ScreenRect(Root);
         int room = (int)Math.Round(30 * Scale);
@@ -350,7 +362,8 @@ sealed partial class DockWindow
         Native.RECT? mark = null, last = null;
         foreach (var child in Apps.Children.OfType<FrameworkElement>())
         {
-            if (child.Tag is not DockEntry { Pin: not null } || child.Visibility != Visibility.Visible) continue;
+            // among the pins, or among the running apps that are not pinned
+            if (child.Tag is not DockEntry d || (d.Pin != null) != pinned || (!pinned && d.ExePath == null) || child.Visibility != Visibility.Visible) continue;
             var r = ScreenRect(child);
             if ((Vertical ? (r.Top + r.Bottom) / 2 : (r.Left + r.Right) / 2) > (Vertical ? p.Y : p.X))
             {
@@ -365,9 +378,9 @@ sealed partial class DockWindow
         return mark is { } m ? (index, m) : null;
     }
 
-    void ShowPinPlace(Native.POINT p)
+    void ShowPinPlace(Native.POINT p, bool pinned = true)
     {
-        if (PinPlace(p) is { } place)
+        if (PinPlace(p, pinned) is { } place)
             Marker.Line(this, place.Mark.Left - (Vertical ? 0 : (int)Math.Round(Apps.Spacing * Scale / 2)), place.Mark.Top - (Vertical ? (int)Math.Round(Apps.Spacing * Scale / 2) : 0),
                 Vertical ? place.Mark.Right - place.Mark.Left : place.Mark.Bottom - place.Mark.Top, Vertical);
         else Marker.Hide();

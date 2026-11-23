@@ -12,10 +12,11 @@
                  (the buttons, the rows of Start and the control center, the icons of the dock) -->
             <ResourceDictionary.ThemeDictionaries>
                 <ResourceDictionary x:Key="Light">
-                    <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="#14000000" />
-                    <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="#0C000000" />
-                    <SolidColorBrush x:Key="SubtleFillColorSecondaryBrush" Color="#14000000" />
-                    <SolidColorBrush x:Key="SubtleFillColorTertiaryBrush" Color="#0C000000" />
+                    <!-- 12 % (8 % was not seen on a light window without transparency, a laptop – 2026-11-23) -->
+                    <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="#1F000000" />
+                    <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="#14000000" />
+                    <SolidColorBrush x:Key="SubtleFillColorSecondaryBrush" Color="#1F000000" />
+                    <SolidColorBrush x:Key="SubtleFillColorTertiaryBrush" Color="#14000000" />
                 </ResourceDictionary>
             </ResourceDictionary.ThemeDictionaries>
 

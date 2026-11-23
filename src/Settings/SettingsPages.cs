@@ -37,7 +37,15 @@ sealed partial class SettingsWindow
             {
                 checkText.Text = L.T("HeMiDock {0} is available.", release.Version.ToString(3));
                 var install = new Button { Content = L.T(Updater.Installed ? "Install" : "Download") };
-                install.Click += (_, _) => _ = Updater.InstallAsync(release);
+                install.Click += (_, _) =>
+                {
+                    // the progress of the download in the text beside it
+                    install.IsEnabled = false;
+                    Action shown = () => { if (Updater.Busy is { } b) checkText.Text = b; };
+                    Updater.Changed += shown;
+                    install.Unloaded += (_, _) => Updater.Changed -= shown;
+                    _ = Updater.InstallAsync(release);
+                };
                 if (check.Parent is StackPanel row && row.Children.Count == 2) row.Children.Add(install);
             }
         };

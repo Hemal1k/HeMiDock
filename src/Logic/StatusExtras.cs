@@ -223,7 +223,8 @@ static class BarMedia
         {
             if (!on)
             {
-                if (_manager != null) _manager.CurrentSessionChanged -= SessionChanged;
+                if (_manager != null) { _manager.CurrentSessionChanged -= SessionChanged; _manager.SessionsChanged -= SessionsChanged; }
+                _picked = false;
                 Use(null);
                 Now = default;
                 Details = null;
@@ -232,13 +233,70 @@ static class BarMedia
             }
             _manager ??= await Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager.RequestAsync();
             _manager.CurrentSessionChanged += SessionChanged;
+            _manager.SessionsChanged += SessionsChanged;
             Use(_manager.GetCurrentSession());
         }
         catch (Exception ex) { Log.Write("BarMedia", ex); }
     }
 
     static void SessionChanged(Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager m, object e) =>
-        OnUi(() => { if (_watching) Use(m.GetCurrentSession()); });
+        OnUi(() => { if (_watching && !_picked) Use(m.GetCurrentSession()); });
+
+    // ───── more players at once (YouTube in a browser and Spotify): all are listed, the one shown can be chosen ─────
+
+    /// <summary>A player with a media session: its app (name and key for the icon), whether it plays, whether it is the one shown.</summary>
+    public sealed record Player(string App, string AppKey, bool Playing, bool Shown);
+
+    /// <summary>All players with a media session (the card lists them when there are more).</summary>
+    public static IReadOnlyList<Player> Players { get; private set; } = Array.Empty<Player>();
+
+    /// <summary>The user chose the player shown: it stays until it ends (else the current one of Windows is shown).</summary>
+    static bool _picked;
+
+    static void SessionsChanged(Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager m, object e) => OnUi(() =>
+    {
+        if (!_watching) return;
+        // the player chosen ended: back to the current one of Windows
+        if (_picked && (_session == null || !m.GetSessions().Any(s => s.SourceAppUserModelId == _session.SourceAppUserModelId)))
+        {
+            _picked = false;
+            Use(m.GetCurrentSession());
+            return;
+        }
+        ListPlayers();
+        Changed?.Invoke();
+    });
+
+    /// <summary>The list read again (whether each plays changes without an event of the player shown).</summary>
+    public static void Relist() => ListPlayers();
+
+    static void ListPlayers()
+    {
+        try
+        {
+            if (_manager == null) { Players = Array.Empty<Player>(); return; }
+            Players = _manager.GetSessions().Select(s =>
+            {
+                var (app, key) = AppOf(s.SourceAppUserModelId);
+                bool playing = s.GetPlaybackInfo()?.PlaybackStatus == Windows.Media.Control.GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing;
+                return new Player(app, key, playing, _session != null && s.SourceAppUserModelId == _session.SourceAppUserModelId);
+            }).ToList();
+        }
+        catch (Exception ex) { Log.Write("BarMedia players", ex); Players = Array.Empty<Player>(); }
+    }
+
+    /// <summary>The player at that place of <see cref="Players"/> is shown and controlled.</summary>
+    public static void Select(int index)
+    {
+        try
+        {
+            var sessions = _manager?.GetSessions();
+            if (sessions == null || index < 0 || index >= sessions.Count) return;
+            _picked = true;
+            Use(sessions[index]);
+        }
+        catch (Exception ex) { Log.Write("BarMedia select", ex); }
+    }
 
     static void Use(Windows.Media.Control.GlobalSystemMediaTransportControlsSession session)
     {
@@ -272,6 +330,7 @@ static class BarMedia
         if (session != _session) return;                               // another session meanwhile
         Now = now;
         Details = details;
+        ListPlayers();
         Changed?.Invoke();
     }
 

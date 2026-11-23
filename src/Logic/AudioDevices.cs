@@ -102,9 +102,12 @@ static class AudioDevices
                 {
                     try
                     {
-                        using var p = Process.GetProcessById((int)s.GetProcessID);
-                        path = p.MainModule?.FileName;
-                        name = p.MainModule?.FileVersionInfo.FileDescription;
+                        // the program by its path, also of a process with higher rights (VMware: its MainModule cannot be read,
+                        // and the app was left out of the mixer)
+                        uint pid = s.GetProcessID;
+                        using var p = Process.GetProcessById((int)pid);
+                        path = Win32.ProcessPath(pid);
+                        try { if (path != null) name = FileVersionInfo.GetVersionInfo(path).FileDescription; } catch { }
                         if (string.IsNullOrWhiteSpace(name)) name = p.ProcessName;
                     }
                     catch { }
