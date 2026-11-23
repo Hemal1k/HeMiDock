@@ -18,6 +18,7 @@ sealed partial class ControlCenterWindow
     readonly StackPanel _networks = new() { Spacing = 1 };
     /// <summary>The card of the list: hidden while there is no network (Wi-Fi off) – an empty card was left before.</summary>
     Border _networksCard;
+    ScrollViewer _networksScroll;
     readonly TextBlock _wifiStatus = new() { FontSize = 12, Margin = new Thickness(8, 0, 8, 4), TextWrapping = TextWrapping.Wrap };
 
     void ShowWifi()
@@ -39,10 +40,14 @@ sealed partial class ControlCenterWindow
         _wifiStatus.Foreground = Res("TextFillColorSecondaryBrush");
         // the list and the status are kept between the visits of the page: out of the old page first (else "Element is
         // already the child of another element" stopped the page half built – no list until it was opened again)
+        // (the parent of the list is the presenter inside the old ScrollViewer once it was shown, not the ScrollViewer itself,
+        // so the old one is kept to let go of the list)
+        if (_networksScroll != null) _networksScroll.Content = null;
         if (_networks.Parent is ScrollViewer old) old.Content = null;
         if (_wifiStatus.Parent is Panel oldPanel) oldPanel.Children.Remove(_wifiStatus);
         _page.Children.Add(_wifiStatus);
-        _networksCard = Card(new ScrollViewer { MaxHeight = 340, Content = _networks }, 4);
+        _networksScroll = new ScrollViewer { MaxHeight = 340, Content = _networks };
+        _networksCard = Card(_networksScroll, 4);
         _networksCard.Visibility = _networks.Children.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
         _page.Children.Add(_networksCard);
         Footer("More Wi-Fi settings", "ms-settings:network-wifi");
