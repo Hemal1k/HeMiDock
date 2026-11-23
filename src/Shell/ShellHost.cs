@@ -287,7 +287,8 @@ static class TrayPins
     static readonly HashSet<string> Duplicates = new(StringComparer.OrdinalIgnoreCase)
     {
         NotificationArea.NETWORK_GUID, NotificationArea.POWER_GUID, NotificationArea.VOLUME_GUID,
-        "7820ae78-23e3-4229-82c1-e41cb67d5b9c"                       // "Safely remove hardware": the dock has its own icon for it
+        "7820ae78-23e3-4229-82c1-e41cb67d5b9c",                      // "Safely remove hardware": the dock has its own icon for it
+        "6da68f06-00f1-4e6e-8158-7f1ffd4f9db9"                       // Bluetooth of Windows (with an adapter): Bluetooth is in the control center
     };
 
     public static bool FirstRun => !File.Exists(FilePath);
