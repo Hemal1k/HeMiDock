@@ -45,19 +45,3 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release upload "${{ github.event.release.tag_name }}" build/dist/HeMiDock-Setup.exe build/dist/HeMiDock-Portable.zip build/dist/HeMiDock-Portable-arm64.zip build/dist/SHA256SUMS.txt --clobber --repo "${{ github.repository }}"
-
-  winget:
-    # the new version to winget as a pull request to microsoft/winget-pkgs (once the app is there and the secret
-    # WINGET_TOKEN – a token of the owner with public_repo – is set; without it the job does nothing)
-    needs: build
-    if: github.event_name == 'release'
-    runs-on: windows-latest
-    steps:
-      - name: Pull request to winget-pkgs
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ secrets.WINGET_TOKEN }}
-        run: |
-          if (-not $env:GH_TOKEN) { Write-Host 'No WINGET_TOKEN - skipped.'; exit 0 }
-          gh api repos/Hemal1k/.github/contents/winget/update.ps1 -H 'Accept: application/vnd.github.raw' > update.ps1
-          ./update.ps1 -App HeMiDock -Version '${{ github.event.release.tag_name }}'

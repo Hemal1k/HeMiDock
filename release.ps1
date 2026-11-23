@@ -13,7 +13,7 @@ if (-not $version) { throw 'No <Version> in src\HeMiDock.csproj.' }
 $iscc = @((Get-Command ISCC.exe -ErrorAction SilentlyContinue).Source,
           "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe", "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe", "$env:ProgramFiles\Inno Setup 6\ISCC.exe") |
         Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
-if (-not $iscc) { throw 'Inno Setup 6 is not installed (winget install JRSoftware.InnoSetup).' }
+if (-not $iscc) { throw 'Inno Setup 6 is not installed (https://jrsoftware.org/isdl.php).' }
 
 $dist = Join-Path $root 'build\dist'
 $work = Join-Path $root 'build\pack'

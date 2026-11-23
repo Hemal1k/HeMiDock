@@ -97,8 +97,7 @@ Name: "{autodesktop}\HeMiDock"; Filename: "{app}\HeMiDock.exe"; Tasks: desktopic
 
 [Run]
 ; the File Explorer items and the start with Windows point to this installation (also after a move from the old folder) –
-; only over an earlier installation: a new one has nothing to point anew, and winget counts any start of the app by its
-; installer as an error (Validation-Shell-Execute)
+; only over an earlier installation: a new one has nothing to point anew
 ; not waited for: on a PC without the Windows App Runtime (a quiet install that could not add it) the app would wait for an
 ; answer to the question of Windows about it, and Setup would never end
 Filename: "{app}\HeMiDock.exe"; Parameters: "--repair"; Flags: runasoriginaluser nowait runhidden; Check: WasInstalled
@@ -133,7 +132,7 @@ Root: HKCU; Subkey: "Software\HeMi"; Flags: uninsdeletekeyifempty dontcreatekey
 var
   OldFolder: String;
   // the dock ran when the installation began (an update): only then it starts again after a quiet installation – a new
-  // quiet installation (winget) does not start it; /UPDATE (the updater of the dock, HeMi Launcher) always does: the dock
+  // quiet installation does not start it; /UPDATE (the updater of the dock, HeMi Launcher) always does: the dock
   // ends before the installer gets to look
   WasRunning: Boolean;
   // HeMiDock was installed before (an update, a repair or a move from the old folder)
@@ -188,7 +187,7 @@ begin
 end;
 
 { the choice of the updates for the dock to take at its next start (HKCU\Software\HeMi\HeMiDock) – not by starting it. A
-  quiet update keeps what was set in the app; a new installation (also by winget) and an installation by hand write it. }
+  quiet update keeps what was set in the app; a new installation (also a quiet one) and an installation by hand write it. }
 procedure SaveUpdateChoice;
 var
   Check, Install: Cardinal;
@@ -292,7 +291,7 @@ begin
 end;
 
 { the Windows App Runtime needs no administrator rights: without them it is installed for this user only (no UAC prompt –
-  a quiet install, e.g. through winget, has nobody to answer one) }
+  a quiet install has nobody to answer one) }
 function RunPlain(const FileName, Params: String): Boolean;
 var
   Code: Integer;
@@ -344,9 +343,8 @@ begin
   DownloadPage := CreateDownloadPage(SetupMessage(msgWizardPreparing), SetupMessage(msgPreparingDesc), nil);
   NeedDotNet := not HasDotNet;
   NeedRuntime := not HasAppRuntime;
-  { a quiet installation without administrator rights (winget in the user scope) never installs .NET: its installer needs
-    them and would wait for a UAC prompt nobody answers (the validation of winget failed so on ARM64); winget brings .NET
-    as a dependency, otherwise Windows asks for it when HeMiDock starts }
+  { a quiet installation without administrator rights never installs .NET: its installer needs them and would wait for
+    a UAC prompt nobody answers; Windows asks for it when HeMiDock starts }
   if WizardSilent and not IsAdmin then NeedDotNet := False;
 #ifdef TestNeedPage
   NeedDotNet := True; NeedRuntime := True;   { ISCC /DTestNeedPage: shows the page on a PC that has everything }
@@ -407,7 +405,7 @@ begin
       if not RunElevated(ExpandConstant('{tmp}\dotnet-runtime.exe'), '/install /quiet /norestart') or not HasDotNet then
       begin
         SuppressibleMsgBox(FmtMessage(CustomMessage('PrereqFailed'), ['.NET 10 Runtime (' + Arch + ')', 'https://dotnet.microsoft.com/download/dotnet/10.0']), mbError, MB_OK, IDOK);
-        { a quiet install goes on without it: winget brings .NET as a dependency, and Windows asks for it at the start }
+        { a quiet install goes on without it: Windows asks for it at the start }
         Result := WizardSilent;
         Exit;
       end;

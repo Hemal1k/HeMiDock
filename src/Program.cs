@@ -25,7 +25,7 @@ static class Program
             return;
         }
         // what the installer and uninstaller start runs here too, before WinUI: on a PC without the Windows App Runtime (a
-        // quiet installation that could not add it – the test PCs of winget) Windows asked about the runtime with a window
+        // quiet installation that could not add it) Windows asked about the runtime with a window
         // --repair: the start at sign-in and "Pin to Start" of Explorer point to this HeMiDock.exe
         if (args.Contains("--repair"))
         {
