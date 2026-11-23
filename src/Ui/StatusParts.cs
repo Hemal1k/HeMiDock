@@ -157,7 +157,7 @@ sealed class StatusParts
     public Button Button { get; }
     readonly StackPanel _icons = new() { Orientation = Orientation.Horizontal, Spacing = 10, VerticalAlignment = VerticalAlignment.Center };
     readonly FontIcon _privacy = Glyph(""), _dnd = Glyph(""), _vpn = Glyph(""), _micMute = Glyph(""), _weather = Glyph(""), _net = Glyph(""), _bt = Glyph(""), _vol = Glyph("");
-    /// <summary>The network icon with the small cable sign shown while Wi-Fi and a cable are connected at once.</summary>
+    /// <summary>The small Wi-Fi sign on the cable icon while Wi-Fi and a cable are connected at once.</summary>
     readonly FontIcon _netCable = new() { Glyph = "", HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Bottom, Visibility = Visibility.Collapsed };
     Grid _netBox;
     readonly BatteryIcon _bat = new();
@@ -432,7 +432,7 @@ sealed class StatusParts
         // as big as the icons of the apps next to them; the cable network (a full monitor) at its size (larger, it outgrew them)
         var (glyph, connected, tip, _) = d.Net;
         bool wifi = tip?.StartsWith("Wi-Fi", StringComparison.OrdinalIgnoreCase) == true;
-        _net.FontSize = Math.Round(S.StatusIconSize * (wifi ? 1.1 : 1.0));
+        _net.FontSize = Math.Round(S.StatusIconSize * (wifi && !d.Net.Both ? 1.1 : 1.0));
         _bt.FontSize = Math.Round(S.StatusIconSize * 1.1);
         _vol.FontSize = Math.Round(S.StatusIconSize * 1.1);
         _bat.Size = S.StatusIconSize + 1;
@@ -443,11 +443,13 @@ sealed class StatusParts
         _dnd.Visibility = V(S.ShowStatusSigns && d.Dnd);
         _vpn.Visibility = V(S.ShowStatusSigns && d.Vpn != null);
         _micMute.Visibility = V(S.ShowStatusSigns && d.MicMuted);
-        _net.Glyph = glyph;
+        // Wi-Fi and a cable at once: the cable (it carries the traffic) big, the Wi-Fi small at its lower right corner (the
+        // user's choice)
+        _net.Glyph = d.Net.Both ? "" : glyph;
         _net.Opacity = connected ? 1 : 0.4;
-        // Wi-Fi and a cable at once: the Wi-Fi with a small cable sign at its lower right corner
+        _netCable.Glyph = glyph;
         _netCable.Visibility = V(d.Net.Both);
-        _netCable.FontSize = Math.Round(S.StatusIconSize * 0.55);
+        _netCable.FontSize = Math.Round(S.StatusIconSize * 0.6);
         _net.Margin = d.Net.Both ? new Thickness(0, 0, Math.Round(S.StatusIconSize * 0.45), 0) : new Thickness(0);
         _netBox.Visibility = V(S.ShowWifi);
         _ = BluetoothWatch.RecheckAsync();
