@@ -30,7 +30,7 @@ Requirements: Windows 10 2004 or newer / Windows 11, x64 or ARM64.
 - **Top bar** (optional, like macOS) with the system menu, the active app and now playing.
 - **Start menu** in three looks; search of apps, Windows settings, files, calculations and conversions; quick controls right in the results ("volume", "wifi", "power mode", "lock"…); quick search
   (Alt + Space); the Start button menu (Win + X).
-- **Control center**: quick buttons, sound with a mixer of apps, brightness, power mode, media, Wi-Fi, Bluetooth, scheduled shutdown.
+- **Control center**: quick buttons, sound with a mixer of apps, brightness, power mode, media (every app that plays, to switch between), Wi-Fi, Bluetooth, scheduled shutdown.
 - **Calendar** with the notifications of Windows and the events of Outlook or an internet calendar.
 - **Window manager**: zones, always on top, workspaces, rules for apps.
 - **Keyboard shortcuts** for every action; settings with search, export / import and automatic backups.
