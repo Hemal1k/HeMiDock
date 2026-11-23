@@ -33,8 +33,7 @@ sealed partial class ControlCenterWindow
             if (_wifi == null) return;
             if (on) _wifiStatus.Text = L.T("Searching for networks…");
             await SwitchRadio(_wifi, on);
-            // a scan started before the switch (with Wi-Fi off) would be waited for instead of a new one
-            _scanning = null;
+            // a scan started before the switch (with Wi-Fi off) is followed by a new one (ScanAsync), never two at once
             await ScanAsync();
         });
         _wifiStatus.Foreground = Res("TextFillColorSecondaryBrush");
@@ -99,13 +98,28 @@ sealed partial class ControlCenterWindow
         {
             _adapterWatched = true;
             // the networks as Windows finds them (also its own scans): the list fills while the scan still runs
-            _adapter.AvailableNetworksChanged += (_, _) => Ui.Post(async () => { if (_openPage == "wifi") await BuildNetworksAsync(byWindows: true); });
+            _adapter.AvailableNetworksChanged += (_, _) => Ui.Post(async () => { if (_openPage == "wifi") await BuildNetworksAsync(); });
         }
         return true;
     }
 
-    /// <summary>Scans once at a time: asked again while it runs (the switch, a change of the network) it waits for the same scan.</summary>
-    Task ScanAsync() => _scanning is { IsCompleted: false } ? _scanning : _scanning = DoScanAsync();
+    bool _scanAgain;
+
+    /// <summary>
+    /// Scans once at a time: asked again while one runs (the switch, the radio changed, the button) one more follows it –
+    /// two at once made the driver refuse the second (no list), and the one before a switch saw the old state.
+    /// </summary>
+    Task ScanAsync()
+    {
+        if (_scanning is { IsCompleted: false }) { _scanAgain = true; return _scanning; }
+        return _scanning = ScanLoopAsync();
+    }
+
+    async Task ScanLoopAsync()
+    {
+        do { _scanAgain = false; await DoScanAsync(); }
+        while (_scanAgain && _openPage == "wifi");
+    }
 
     async Task DoScanAsync()
     {
@@ -126,6 +140,13 @@ sealed partial class ControlCenterWindow
             // a scan can take long or hang with some drivers: after a few seconds the networks found so far
             var scan = _adapter.ScanAsync().AsTask();
             await Task.WhenAny(scan, Task.Delay(6000));
+            if (scan.IsFaulted)
+            {
+                // refused right after the radio came on (the adapter not ready yet): once more a moment later
+                Diag.Write("Wi-Fi", "scan refused: " + scan.Exception?.InnerException?.Message);
+                await Task.Delay(2000);
+                await Task.WhenAny(_adapter.ScanAsync().AsTask(), Task.Delay(6000));
+            }
             if (_openPage == "wifi") await BuildNetworksAsync();
             // right after Wi-Fi is switched on the first scan often finds nothing yet: once more a moment later
             if (_openPage == "wifi" && _networks.Children.Count == 0 && _wifi?.State == RadioState.On)
@@ -145,10 +166,14 @@ sealed partial class ControlCenterWindow
     }
     sealed record WifiNetwork(string Ssid, byte Bars, bool Secured, WiFiAvailableNetwork Real, string Details);
 
-    /// <summary>The list of networks; one refreshed by Windows is skipped while a network is unfolded (a key being typed).</summary>
-    async Task BuildNetworksAsync(bool byWindows = false)
+    /// <summary>
+    /// The list of networks. While a network is unfolded (a key being typed, a connection running) the rows stay as they are
+    /// – a scan, a change of the network or a new list of Windows rebuilt them before, and the typed key was gone; only the
+    /// status line follows. <paramref name="force"/>: after connecting or disconnecting.
+    /// </summary>
+    async Task BuildNetworksAsync(bool force = false)
     {
-        if (byWindows && _networks.Children.OfType<StackPanel>().Any(r => r.Children.Count > 1 && r.Children[1].Visibility == Visibility.Visible)) return;
+        bool unfolded = _networks.Children.OfType<StackPanel>().Any(r => r.Children.Count > 1 && r.Children[1].Visibility == Visibility.Visible);
         string connected = null;
         IEnumerable<WifiNetwork> available;
 #if DEBUG
@@ -168,6 +193,7 @@ sealed partial class ControlCenterWindow
         var networks = available.OrderByDescending(n => n.Ssid == connected).ThenByDescending(n => n.Bars).ToList();
         var known = KnownNetworks();
         _wifiStatus.Text = networks.Count == 0 ? L.T("No networks found.") : connected != null ? L.T("Connected to {0}", connected) : L.T("Not connected");
+        if (unfolded && !force) return;
         _networks.Children.Clear();
         foreach (var n in networks) _networks.Children.Add(NetworkRow(n, n.Ssid == connected, known.Contains(n.Ssid)));
         if (_networksCard != null) _networksCard.Visibility = networks.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
@@ -219,7 +245,7 @@ sealed partial class ControlCenterWindow
 #endif
                 try { _adapter.Disconnect(); } catch (Exception ex) { Log.Write("Wi-Fi disconnect", ex); }
                 await Task.Delay(800);
-                await BuildNetworksAsync();
+                await BuildNetworksAsync(force: true);
             };
             details.Children.Add(disconnect);
         }
@@ -252,21 +278,32 @@ sealed partial class ControlCenterWindow
                         await Task.Delay(400);
                         if (n.Secured && password?.Password != Simulation.WifiPassword) { message.Text = L.T("The security key is not correct."); connect.IsEnabled = true; return; }
                         Simulation.WifiConnected = n.Ssid;
-                        await BuildNetworksAsync();
+                        await BuildNetworksAsync(force: true);
                         return;
                     }
 #endif
                     var kind = auto.IsChecked == true ? WiFiReconnectionKind.Automatic : WiFiReconnectionKind.Manual;
-                    var result = password != null && password.Password.Length > 0
-                        ? await _adapter.ConnectAsync(n.Real, kind, new PasswordCredential { Password = password.Password })
-                        : await _adapter.ConnectAsync(n.Real, kind);
+                    long started = System.Diagnostics.Stopwatch.GetTimestamp();
+                    var connecting = (password != null && password.Password.Length > 0
+                        ? _adapter.ConnectAsync(n.Real, kind, new PasswordCredential { Password = password.Password })
+                        : _adapter.ConnectAsync(n.Real, kind)).AsTask();
+                    // some drivers never answer a wrong key or a network gone weak: after 25 s the user is told, not left waiting
+                    if (await Task.WhenAny(connecting, Task.Delay(25000)) != connecting)
+                    {
+                        Diag.Write("Wi-Fi", "connect: no answer in 25 s");
+                        message.Text = L.T("The network did not respond. Try again.");
+                        connect.IsEnabled = true;
+                        return;
+                    }
+                    var result = await connecting;
+                    Diag.Write("Wi-Fi", $"connect: {result.ConnectionStatus} in {System.Diagnostics.Stopwatch.GetElapsedTime(started).TotalMilliseconds:0} ms");
                     bool ok = result.ConnectionStatus == WiFiConnectionStatus.Success;
                     // refused without a clear reason (some versions of Windows do so for apps): the same through the tool of Windows
                     if (!ok && result.ConnectionStatus is WiFiConnectionStatus.AccessRevoked or WiFiConnectionStatus.UnspecifiedFailure)
                         ok = await WifiFallback.ConnectAsync(n.Real, password?.Password, auto.IsChecked == true);
                     switch (ok ? WiFiConnectionStatus.Success : result.ConnectionStatus)
                     {
-                        case WiFiConnectionStatus.Success: await BuildNetworksAsync(); return;
+                        case WiFiConnectionStatus.Success: await BuildNetworksAsync(force: true); return;
                         case WiFiConnectionStatus.InvalidCredential when password != null && password.Visibility != Visibility.Visible:
                             keyLabel.Visibility = password.Visibility = Visibility.Visible;
                             message.Text = L.T("The saved key no longer works. Enter the network security key.");

@@ -115,6 +115,7 @@ sealed partial class ControlCenterWindow : PopupWindow
         _editing = false;
         ShowMain();
         _poll.Start();
+        if (_wifi == null || _bt == null) _ = LoadRadiosAsync();
         OpenRequested();
     }
 
@@ -128,16 +129,29 @@ sealed partial class ControlCenterWindow : PopupWindow
         return true;
     }
 
+    /// <summary>
+    /// The radios; a missing one is looked for again at every opening – a USB Wi-Fi / Bluetooth adapter plugged in after the
+    /// start of the dock had no tile until the dock was restarted.
+    /// </summary>
     async Task LoadRadiosAsync()
     {
-        _wifi = await RadioSwitch.FindAsync(RadioKind.WiFi);
-        _bt = await RadioSwitch.FindAsync(RadioKind.Bluetooth);
-        _cell = await RadioSwitch.FindAsync(RadioKind.MobileBroadband);   // a SIM / eSIM modem (only some notebooks and tablets)
-        if (_cell != null) _cell.StateChanged += () => Ui.Post(Refresh);
-        if (_wifi != null) _wifi.StateChanged += () => Ui.Post(Refresh);
-        if (_bt != null) _bt.StateChanged += () => Ui.Post(Refresh);
-        Refresh();
+        if (_loadingRadios) return;                                  // the start and an opening at once: one search
+        _loadingRadios = true;
+        try { await FindRadiosAsync(); } finally { _loadingRadios = false; }
     }
+    bool _loadingRadios;
+
+    async Task FindRadiosAsync()
+    {
+        bool found = false;
+        if (_wifi == null && (_wifi = await RadioSwitch.FindAsync(RadioKind.WiFi)) != null) { _wifi.StateChanged += () => Ui.Post(Refresh); found = true; }
+        if (_bt == null && (_bt = await RadioSwitch.FindAsync(RadioKind.Bluetooth)) != null) { _bt.StateChanged += () => Ui.Post(Refresh); found = true; }
+        // a SIM / eSIM modem (only some notebooks and tablets)
+        if (_cell == null && (_cell = await RadioSwitch.FindAsync(RadioKind.MobileBroadband)) != null) { _cell.StateChanged += () => Ui.Post(Refresh); found = true; }
+        if (found || !_radiosLoaded) Refresh();
+        _radiosLoaded = true;
+    }
+    bool _radiosLoaded;
 
     void Refresh()
     {
