@@ -151,6 +151,50 @@ sealed partial class ControlCenterWindow
         return Card(new StackPanel { Spacing = 6, Children = { head, row } });
     }
 
+    /// <summary>
+    /// The battery and the power mode in one card (a notebook shows both): the battery with its state and the saver on top,
+    /// the three modes in one row under it - one card instead of two, without their titles (the user's wish, 2026-11-23).
+    /// </summary>
+    FrameworkElement PowerBatteryCard((int Percent, bool Plugged, bool Charging, bool Saver, int SecondsLeft) b)
+    {
+        string state = b.Plugged ? (b.Percent >= 100 ? L.T("Fully charged") : L.T("Charging"))
+            : b.SecondsLeft > 0 ? L.T("{0} h {1} min remaining", b.SecondsLeft / 3600, b.SecondsLeft / 60 % 60) : L.T("On battery");
+        var head = new Grid { ColumnSpacing = 6, ColumnDefinitions = { new ColumnDefinition(), new ColumnDefinition { Width = GridLength.Auto }, new ColumnDefinition { Width = GridLength.Auto } } };
+        head.Children.Add(new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10, VerticalAlignment = VerticalAlignment.Center, Children =
+        {
+            Battery(b.Percent, b.Plugged),
+            new StackPanel { Children = { new TextBlock { Text = b.Percent + " %", FontWeight = Microsoft.UI.Text.FontWeights.SemiBold }, new TextBlock { Text = state, FontSize = 11, Foreground = Res("TextFillColorSecondaryBrush") } } }
+        } });
+        var saver = new ToggleButton { IsChecked = BatterySaver.IsOn == true, IsEnabled = BatterySaver.IsOn != null, Padding = new Thickness(8, 6, 8, 6), VerticalAlignment = VerticalAlignment.Center,
+            Content = new FontIcon { Glyph = "\uEBB4", FontSize = 14 } };
+        ToolTipService.SetToolTip(saver, BatterySaver.IsOn == null ? L.T("Battery saver works only on battery") : L.T(BatterySaver.IsOn == true ? "Battery saver: on" : "Battery saver: off"));
+        saver.Click += async (_, _) => { if (BatterySaver.IsOn is bool on) { saver.IsEnabled = false; await Task.Run(() => BatterySaver.Set(!on)); await Task.Delay(400); BuildMain(); } };
+        Grid.SetColumn(saver, 1);
+        head.Children.Add(saver);
+        var settings = new Button { Style = DockButton, Padding = new Thickness(6, 4, 6, 4), VerticalAlignment = VerticalAlignment.Center, Content = new FontIcon { Glyph = "\uE9E9", FontSize = 12 } };
+        ToolTipService.SetToolTip(settings, L.T("Power & battery"));
+        settings.Click += (_, _) => Open("ms-settings:powersleep");
+        Grid.SetColumn(settings, 2);
+        head.Children.Add(settings);
+        var panel = new StackPanel { Spacing = 10, Children = { head } };
+        if (PowerMode.Current is { } now)
+        {
+            var row = new Grid { ColumnSpacing = 6, ColumnDefinitions = { new ColumnDefinition(), new ColumnDefinition(), new ColumnDefinition() } };
+            int i = 0;
+            foreach (var (glyph, name, mode) in new[] { ("\uEC0A", "Efficiency", PowerMode.Efficiency), ("\uE945", "Balanced", PowerMode.Balanced), ("\uEC4A", "Performance", PowerMode.Performance) })
+            {
+                var m = new ToggleButton { IsChecked = now == mode, HorizontalAlignment = HorizontalAlignment.Stretch, Padding = new Thickness(4, 6, 4, 6),
+                    Content = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, Children = { new FontIcon { Glyph = glyph, FontSize = 13 }, new TextBlock { Text = L.T(name), FontSize = 11.5, TextTrimming = TextTrimming.CharacterEllipsis } } } };
+                ToolTipService.SetToolTip(m, L.T("Power mode") + ": " + L.T(name));
+                m.Click += (_, _) => { PowerMode.Set(mode); BuildMain(); };
+                Grid.SetColumn(m, i++);
+                row.Children.Add(m);
+            }
+            panel.Children.Add(row);
+        }
+        return Card(panel);
+    }
+
     static BatteryIcon Battery(int percent, bool plugged) { var i = new BatteryIcon { Size = 20 }; i.Show(percent, plugged); return i; }
 
     FrameworkElement MediaCard()

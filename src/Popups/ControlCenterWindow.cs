@@ -217,6 +217,7 @@ sealed partial class ControlCenterWindow : PopupWindow
         };
 
         FrameworkElement Part(FrameworkElement card, string id) => _editing ? Editable(card, id, tile: false) : card;
+        bool powerDone = false;
         foreach (var id in QuickLayout.SectionOrder.Where(id => (QuickLayout.IsShown(id) || _editing) && !QuickLayout.OnBar(id)))
             switch (id)
             {
@@ -226,6 +227,12 @@ sealed partial class ControlCenterWindow : PopupWindow
                     var holder = new Border();                                          // its place in the order; filled when the brightness is known
                     _main.Children.Add(holder);
                     _ = AddBrightnessAsync(holder);
+                    break;
+                // the battery and the power mode both shown: one card at the place of the first of them (while editing apart,
+                // to move or hide each)
+                case "power" or "battery" when !_editing && QuickLayout.IsShown("power") && QuickLayout.IsShown("battery") && !QuickLayout.OnBar("power") && !QuickLayout.OnBar("battery") && StatusInfo.Battery() is { } pb:
+                    if (!powerDone) _main.Children.Add(PowerBatteryCard(pb));
+                    powerDone = true;
                     break;
                 case "power": if (PowerMode.Current != null) _main.Children.Add(Part(PowerCard(), id)); break;
                 case "battery": if (StatusInfo.Battery() is { } b) _main.Children.Add(Part(BatteryCard(b), id)); break;
