@@ -67,15 +67,26 @@ static class QuickControlView
             case ControlType.Choice:
             {
                 var options = c.Options?.Invoke() ?? new List<string>();
-                var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4, VerticalAlignment = VerticalAlignment.Center, Tag = -1 };
+                // the options share the width the name leaves: long names of devices end with "…" instead of running over
+                // the name and out of the row (a StackPanel did not shrink them)
+                var row = new Grid { ColumnSpacing = 4, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Right, Tag = -1 };
                 for (int i = 0; i < options.Count; i++)
                 {
                     int index = i;
-                    var b = new Button { Content = new TextBlock { Text = options[i], TextTrimming = TextTrimming.CharacterEllipsis, MaxWidth = 150 }, Padding = new Thickness(10, 4, 10, 4), IsEnabled = false };
+                    row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star), MaxWidth = 170 });
+                    var b = new Button
+                    {
+                        Content = new TextBlock { Text = options[i], TextTrimming = TextTrimming.CharacterEllipsis }, Padding = new Thickness(10, 4, 10, 4),
+                        HorizontalAlignment = HorizontalAlignment.Stretch, CornerRadius = new CornerRadius(6), IsEnabled = false
+                    };
+                    ToolTipService.SetToolTip(b, options[i]);
                     b.Click += (_, _) => Choose(c, row, index);
+                    Grid.SetColumn(b, i);
                     row.Children.Add(b);
                 }
                 right = row;
+                grid.ColumnDefinitions[1].Width = GridLength.Auto;             // the name whole, the options in the rest
+                grid.ColumnDefinitions[2].Width = new GridLength(1, GridUnitType.Star);
                 c.Widget = row;
                 break;
             }
@@ -116,13 +127,13 @@ static class QuickControlView
             {
                 case Slider s: s.Value = now; s.IsEnabled = true; break;
                 case ToggleSwitch t: t.IsOn = now > 0.5; t.IsEnabled = true; break;
-                case StackPanel p: Mark(p, (int)now); foreach (var b in p.Children.OfType<Button>()) b.IsEnabled = true; break;
+                case Grid p: Mark(p, (int)now); foreach (var b in p.Children.OfType<Button>()) b.IsEnabled = true; break;
             }
             loading = false;
         }
     }
 
-    static void Mark(StackPanel row, int index)
+    static void Mark(Grid row, int index)
     {
         row.Tag = index;
         int i = 0;
@@ -130,10 +141,11 @@ static class QuickControlView
         {
             bool on = i++ == index;
             b.Style = on ? (Style)Application.Current.Resources["AccentButtonStyle"] : null;
+            b.CornerRadius = new CornerRadius(6);                              // rounded as the rest (the style change took it)
         }
     }
 
-    static void Choose(QuickControl c, StackPanel row, int index)
+    static void Choose(QuickControl c, Grid row, int index)
     {
         Mark(row, index);
         _ = c.Set(index);
@@ -148,7 +160,7 @@ static class QuickControlView
             case ControlType.Toggle when c.Widget is ToggleSwitch t && t.IsEnabled:
                 t.IsOn = !t.IsOn;
                 return false;
-            case ControlType.Choice when c.Widget is StackPanel row && row.Children.Count > 0 && row.Children[0].IsHitTestVisible && ((Button)row.Children[0]).IsEnabled:
+            case ControlType.Choice when c.Widget is Grid row && row.Children.Count > 0 && row.Children[0].IsHitTestVisible && ((Button)row.Children[0]).IsEnabled:
                 Choose(c, row, ((row.Tag as int? ?? -1) + 1) % row.Children.Count);
                 return false;
             case ControlType.Action:
