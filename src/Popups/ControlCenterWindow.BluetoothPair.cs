@@ -26,6 +26,45 @@ sealed partial class ControlCenterWindow
     bool _btRenderPosted;
 
     const string SignalKey = "System.Devices.Aep.SignalStrength";
+    const string CodMajor = "System.Devices.Aep.Bluetooth.Cod.Major", CodMinor = "System.Devices.Aep.Bluetooth.Cod.Minor",
+        LeCategory = "System.Devices.Aep.Bluetooth.Le.Appearance.Category", LeSub = "System.Devices.Aep.Bluetooth.Le.Appearance.Subcategory";
+    static readonly string[] KindKeys = { CodMajor, CodMinor, LeCategory, LeSub };
+
+    static int? Num(IReadOnlyDictionary<string, object> p, string key)
+    {
+        try { return p != null && p.TryGetValue(key, out var v) && v != null ? Convert.ToInt32(v) : null; } catch { return null; }
+    }
+
+    /// <summary>
+    /// The symbol of a Bluetooth device by what it is: its class (classic Bluetooth) or its appearance (LE) – headphones,
+    /// a speaker, a display, a phone, a computer, a mouse, a keyboard, a game controller, a printer; else the Bluetooth sign.
+    /// </summary>
+    static string BtGlyph(IReadOnlyDictionary<string, object> p)
+    {
+        int? major = Num(p, CodMajor), minor = Num(p, CodMinor);
+        switch (major)
+        {
+            case 1: return "";                                       // computer
+            case 2: return "";                                       // phone
+            case 4:                                                          // audio / video
+                return minor switch { 14 or 15 or 9 => "", 5 or 10 or 8 => "", _ => "" };
+            case 5:                                                          // peripheral
+                int m = minor ?? 0;
+                return (m & 0x30) == 0x20 ? "" : (m & 0x30) != 0 ? "" : (m & 0x0F) is 1 or 2 ? "" : "";
+            case 6: return "";                                       // imaging: a printer
+        }
+        switch (Num(p, LeCategory))
+        {
+            case 1: return "";
+            case 2: return "";
+            case 15: return Num(p, LeSub) switch { 1 => "", 2 => "", 3 or 4 => "", _ => "" };
+            case 65 or 66: return "";
+        }
+        return "";
+    }
+
+    /// <summary>The battery sign by its level (ten steps).</summary>
+    static string BatteryGlyph(int percent) => percent >= 95 ? "" : ((char)(0xE850 + Math.Clamp((percent + 5) / 10, 0, 9))).ToString();
 
     /// <summary>The part under the paired devices: the button, or the devices found nearby.</summary>
     void AddNearbySection()
@@ -49,7 +88,7 @@ sealed partial class ControlCenterWindow
         _btDiscovering = true;
         try
         {
-            string[] props = { SignalKey, "System.Devices.Aep.IsPaired" };
+            string[] props = new[] { SignalKey, "System.Devices.Aep.IsPaired" }.Concat(KindKeys).ToArray();
             foreach (var (selector, le) in new[] { (Windows.Devices.Bluetooth.BluetoothDevice.GetDeviceSelectorFromPairingState(false), false), (Windows.Devices.Bluetooth.BluetoothLEDevice.GetDeviceSelectorFromPairingState(false), true) })
             {
                 var w = DeviceInformation.CreateWatcher(selector, props, DeviceInformationKind.AssociationEndpoint);
@@ -142,7 +181,7 @@ sealed partial class ControlCenterWindow
     {
         bool pairing = d.Id == _btPairingId;
         string sub = d.Id == _btPairNoteId && _btPairNote != null ? _btPairNote : pairing ? L.T("Pairing…") : le ? "Bluetooth LE" : "Bluetooth";
-        var row = PageRow("", d.Name, false, () => { if (_btPairingId == null) _ = PairAsync(d); }, sub);
+        var row = DeviceRow(BtGlyph(d.Properties), d.Name, pairing, () => { if (_btPairingId == null) _ = PairAsync(d); }, sub, pairing ? null : "");
         if (_btConfirm is not { } ask || ask.Id != d.Id) return row;
         // a PIN shown on the device too: the user compares and says yes or no
         var yes = new Button { Content = L.T("Pair"), Style = (Style)Application.Current.Resources["AccentButtonStyle"] };

@@ -124,7 +124,7 @@ sealed partial class ControlCenterWindow
     async Task DoScanAsync()
     {
         long started = System.Diagnostics.Stopwatch.GetTimestamp();
-        if (_wifi?.State != RadioState.On) { _networks.Children.Clear(); if (_networksCard != null) _networksCard.Visibility = Visibility.Collapsed; _wifiStatus.Text = L.T("Wi-Fi is turned off."); return; }
+        if (_wifi?.State != RadioState.On) { _networks.Children.Clear(); _networksBuilt = -1; if (_networksCard != null) _networksCard.Visibility = Visibility.Collapsed; _wifiStatus.Text = L.T("Wi-Fi is turned off."); return; }
         _wifiStatus.Text = L.T("Searching for networks…");
         try
         {
@@ -165,6 +165,7 @@ sealed partial class ControlCenterWindow
         }
     }
     string _networksShown;
+    int _networksBuilt = -1;
     (string Ssid, DateTime At)? _justConnected;
 
     /// <summary>
@@ -217,10 +218,16 @@ sealed partial class ControlCenterWindow
         // the same list again (a scan, a change of the network, a new list of Windows – several in a second after connecting)
         // is not rebuilt: every rebuild made the list jump
         string shown = string.Join("|", networks.Select(n => $"{n.Ssid}/{n.Bars}/{n.Ssid == connected}/{known.Contains(n.Ssid)}"));
-        if (shown == _networksShown && !unfolded && _networks.Children.Count == networks.Count) return;
+        if (shown == _networksShown && !unfolded && _networksBuilt == networks.Count) return;
         _networksShown = shown;
+        _networksBuilt = networks.Count;
         _networks.Children.Clear();
-        foreach (var n in networks) _networks.Children.Add(NetworkRow(n, n.Ssid == connected, known.Contains(n.Ssid)));
+        // the connected network apart on top, the others under their own heading
+        bool any = networks.Any(n => n.Ssid == connected);
+        if (any) _networks.Children.Add(ListHeading("Connected"));
+        foreach (var n in networks.Where(n => n.Ssid == connected)) _networks.Children.Add(NetworkRow(n, true, known.Contains(n.Ssid)));
+        if (any && networks.Count > 1) _networks.Children.Add(ListHeading("Available networks"));
+        foreach (var n in networks.Where(n => n.Ssid != connected)) _networks.Children.Add(NetworkRow(n, false, known.Contains(n.Ssid)));
         if (_networksCard != null) _networksCard.Visibility = networks.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
         Place();
     }
@@ -255,7 +262,8 @@ sealed partial class ControlCenterWindow
         {
             foreach (var p in NetworkInformation.GetConnectionProfiles())
             {
-                if (!p.IsWlanConnectionProfile || p.GetNetworkConnectivityLevel() == NetworkConnectivityLevel.None) continue;
+                // (no check of the connectivity: right after connecting it is "none" for a second – the network was not shown as connected)
+                if (!p.IsWlanConnectionProfile) continue;
                 string ssid = p.WlanConnectionProfileDetails?.GetConnectedSsid();
                 if (!string.IsNullOrEmpty(ssid)) return ssid;
             }
@@ -276,8 +284,8 @@ sealed partial class ControlCenterWindow
     {
         var details = new StackPanel { Margin = new Thickness(36, 6, 6, 6), Spacing = 6, Visibility = Visibility.Collapsed };
         var message = new TextBlock { FontSize = 12, TextWrapping = TextWrapping.Wrap, Foreground = Res("TextFillColorSecondaryBrush"), Visibility = Visibility.Collapsed };
-        var header = PageRow(SignalGlyph(n.Bars), n.Ssid, connected, () => details.Visibility = details.Visibility == Visibility.Visible ? Visibility.Collapsed : Visibility.Visible,
-            (connected ? L.T("Connected") + ", " : "") + n.Details, "");
+        var header = DeviceRow(SignalGlyph(n.Bars), n.Ssid, connected, () => details.Visibility = details.Visibility == Visibility.Visible ? Visibility.Collapsed : Visibility.Visible,
+            (connected ? L.T("Connected") + " · " : "") + n.Details, n.Secured ? "" : null, "");
         if (connected)
         {
             var disconnect = new Button { Content = L.T("Disconnect"), HorizontalAlignment = HorizontalAlignment.Right };

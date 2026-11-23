@@ -48,11 +48,11 @@ sealed partial class ControlCenterWindow
             return;
         }
         if (_page.Children.Count == 0) Searching("Searching for devices…");   // the list of Windows takes a moment
-        var devices = new List<(string Id, string Name, bool Connected, int? Battery)>();
+        var devices = new List<(string Id, string Name, bool Connected, int? Battery, string Glyph)>();
         try
         {
 #if DEBUG
-            if (Simulation.Bluetooth) devices.AddRange(Simulation.BluetoothDevices.Select(d => (d.Name, d.Name, d.Connected, d.Connected ? (int?)80 : null)));
+            if (Simulation.Bluetooth) devices.AddRange(Simulation.BluetoothDevices.Select(d => (d.Name, d.Name, d.Connected, d.Connected ? (int?)80 : null, "")));
             else
 #endif
             {
@@ -60,14 +60,14 @@ sealed partial class ControlCenterWindow
                 var kind = Windows.Devices.Enumeration.DeviceInformationKind.AssociationEndpoint;
                 var paired = new List<Windows.Devices.Enumeration.DeviceInformation>();
                 foreach (var s in new[] { Windows.Devices.Bluetooth.BluetoothDevice.GetDeviceSelectorFromPairingState(true), Windows.Devices.Bluetooth.BluetoothLEDevice.GetDeviceSelectorFromPairingState(true) })
-                    paired.AddRange(await Windows.Devices.Enumeration.DeviceInformation.FindAllAsync(s, new[] { ContainerKey }, kind));
+                    paired.AddRange(await Windows.Devices.Enumeration.DeviceInformation.FindAllAsync(s, new[] { ContainerKey }.Concat(KindKeys).ToArray(), kind));
                 var connected = new HashSet<string>();
                 foreach (var s in new[] { Windows.Devices.Bluetooth.BluetoothDevice.GetDeviceSelectorFromConnectionStatus(Windows.Devices.Bluetooth.BluetoothConnectionStatus.Connected), Windows.Devices.Bluetooth.BluetoothLEDevice.GetDeviceSelectorFromConnectionStatus(Windows.Devices.Bluetooth.BluetoothConnectionStatus.Connected) })
                     foreach (var d in await Windows.Devices.Enumeration.DeviceInformation.FindAllAsync(s, null, kind)) connected.Add(d.Id);
                 foreach (var d in paired.Where(d => !string.IsNullOrWhiteSpace(d.Name)).GroupBy(d => d.Name).Select(g => g.OrderByDescending(d => connected.Contains(d.Id)).First()))
                 {
                     bool linked = connected.Contains(d.Id);
-                    devices.Add((d.Id, d.Name, linked, linked ? await BatteryOf(d) : null));
+                    devices.Add((d.Id, d.Name, linked, linked ? await BatteryOf(d) : null, BtGlyph(d.Properties)));
                 }
             }
         }
@@ -76,10 +76,21 @@ sealed partial class ControlCenterWindow
         _page.Children.Clear();
         Diag.Write("Bluetooth", $"{devices.Count} devices ({devices.Count(d => d.Connected)} connected) in {System.Diagnostics.Stopwatch.GetElapsedTime(started).TotalMilliseconds:0} ms");
         if (devices.Count == 0) Note("No paired devices.");
-        var card = devices.Count == 0 ? null : PageCard();
-        foreach (var d in devices.OrderByDescending(d => d.Connected).ThenBy(d => d.Name))
-            card.Children.Add(PageRow("", d.Name, d.Connected, () => ConnectBluetooth(d.Id, d.Connected),
-                L.T(d.Connected ? "Connected" : "Paired") + (d.Battery is { } percent ? $" · {L.T("Battery")} {percent} %" : "")));
+        else
+        {
+            var card = PageCard();
+            bool anyConnected = devices.Any(d => d.Connected);
+            if (anyConnected) card.Children.Add(ListHeading("Connected"));
+            foreach (var d in devices.Where(d => d.Connected).OrderBy(d => d.Name))
+                card.Children.Add(DeviceRow(d.Glyph, d.Name, true, () => ConnectBluetooth(d.Id, true),
+                    L.T("Connected") + (d.Battery is { } percent ? $" · {L.T("Battery")} {percent} %" : ""), d.Battery is { } b ? BatteryGlyph(b) : null));
+            if (devices.Any(d => !d.Connected))
+            {
+                if (anyConnected) card.Children.Add(ListHeading("Paired"));
+                foreach (var d in devices.Where(d => !d.Connected).OrderBy(d => d.Name))
+                    card.Children.Add(DeviceRow(d.Glyph, d.Name, false, () => ConnectBluetooth(d.Id, false), L.T("Paired – click to connect")));
+            }
+        }
         AddNearbySection();                                              // "Add device" or the devices found nearby
         Place();
     }

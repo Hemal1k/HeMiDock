@@ -49,7 +49,11 @@ static class ClockText
 static class StatusInfo
 {
     /// <summary>The symbol of the connection now (Segoe Fluent Icons), whether there is one and its description.</summary>
-    public static (string Glyph, bool Connected, string Tip) Network()
+    /// <summary>
+    /// The network for the status icon. <c>Both</c>: Wi-Fi and a cable at once – the icon shows the Wi-Fi with a small
+    /// cable sign (the user's wish, 2026-11-23); the cable carries the traffic then, Wi-Fi stands ready.
+    /// </summary>
+    public static (string Glyph, bool Connected, string Tip, bool Both) Network()
     {
         bool hasWifi = false;
         NetworkInterface wlan = null, eth = null;
@@ -74,10 +78,11 @@ static class StatusInfo
                 if (profile?.IsWlanConnectionProfile == true) { bars = profile.GetSignalBars() ?? 4; ssid = profile.ProfileName; }
             }
             catch { }
-            return (bars <= 1 ? "" : bars == 2 ? "" : bars == 3 ? "" : "", true, "Wi-Fi: " + (ssid ?? wlan.Name));
+            if (eth != null) return (bars <= 1 ? "" : bars == 2 ? "" : bars == 3 ? "" : "", true, "Wi-Fi: " + (ssid ?? wlan.Name) + " · " + eth.Name, true);
+            return (bars <= 1 ? "" : bars == 2 ? "" : bars == 3 ? "" : "", true, "Wi-Fi: " + (ssid ?? wlan.Name), false);
         }
-        if (eth != null) return ("", true, eth.Name);
-        return (hasWifi ? "" : "", false, hasWifi ? L.T("Wi-Fi: not connected") : L.T("No connection"));
+        if (eth != null) return ("", true, eth.Name, false);
+        return (hasWifi ? "" : "", false, hasWifi ? L.T("Wi-Fi: not connected") : L.T("No connection"), false);
     }
 
     /// <summary>The battery: null on a PC without one.</summary>

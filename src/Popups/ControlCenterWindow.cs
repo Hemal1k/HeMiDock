@@ -170,7 +170,7 @@ sealed partial class ControlCenterWindow : PopupWindow
 
     // ───────────────────────── main page ─────────────────────────
 
-    (string Glyph, bool Connected, string Tip)? _net;
+    (string Glyph, bool Connected, string Tip, bool Both)? _net;
 
     void BuildMain()
     {

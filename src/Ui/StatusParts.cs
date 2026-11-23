@@ -9,7 +9,7 @@ namespace HeMiDock;
 /// <summary>What the status icons show, read at one moment.</summary>
 sealed record StatusSnapshot(
     List<string> Mic, List<string> Cam, List<string> Place, bool Dnd, string Vpn, bool MicMuted, IntPtr[] Layouts, IntPtr Layout, int Removable,
-    (string Glyph, bool Connected, string Tip) Net, (float Level, bool Mute, string Name)? Audio,
+    (string Glyph, bool Connected, string Tip, bool Both) Net, (float Level, bool Mute, string Name)? Audio,
     (int Percent, bool Plugged, bool Charging, bool Saver, int SecondsLeft)? Battery, bool UpdateRestart, bool Security);
 
 /// <summary>
@@ -157,6 +157,9 @@ sealed class StatusParts
     public Button Button { get; }
     readonly StackPanel _icons = new() { Orientation = Orientation.Horizontal, Spacing = 10, VerticalAlignment = VerticalAlignment.Center };
     readonly FontIcon _privacy = Glyph(""), _dnd = Glyph(""), _vpn = Glyph(""), _micMute = Glyph(""), _weather = Glyph(""), _net = Glyph(""), _bt = Glyph(""), _vol = Glyph("");
+    /// <summary>The network icon with the small cable sign shown while Wi-Fi and a cable are connected at once.</summary>
+    readonly FontIcon _netCable = new() { Glyph = "", HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Bottom, Visibility = Visibility.Collapsed };
+    Grid _netBox;
     readonly BatteryIcon _bat = new();
     readonly TextBlock _weatherText = Text(), _volText = Text(), _batText = Text();
     readonly Grid _btIcon = new() { VerticalAlignment = VerticalAlignment.Center };
@@ -205,6 +208,7 @@ sealed class StatusParts
     public StatusParts(Button host = null)
     {
         _privacy.Foreground = _place.Foreground = ThemeBrush.Get("SystemFillColorCautionBrush");
+        _netBox = new Grid { VerticalAlignment = VerticalAlignment.Center, Children = { _net, _netCable } };
         _btOff = new Line { X1 = 0, Y1 = 0, X2 = 1, Y2 = 1, Stretch = Stretch.Fill, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, StrokeThickness = 1.4, IsHitTestVisible = false, Stroke = ThemeBrush.Get("TextFillColorPrimaryBrush") };
         _btIcon.Children.Add(_bt);
         _btIcon.Children.Add(_btOff);
@@ -236,7 +240,7 @@ sealed class StatusParts
         _appUpdate.Children.Add(_appUpdateIcon);
         _appUpdate.Tapped += (_, e) => { e.Handled = true; AppUpdateMenu(_appUpdate); };
         _appUpdate.RightTapped += (_, e) => { e.Handled = true; AppUpdateMenu(_appUpdate); };
-        foreach (var e in new UIElement[] { _appUpdate, _updateIcon, _security, _privacy, _place, _dnd, _vpn, _micMute, _weather, _weatherText, _net, _btPanel, _volPanel, _batPanel }) _icons.Children.Add(e);
+        foreach (var e in new UIElement[] { _appUpdate, _updateIcon, _security, _privacy, _place, _dnd, _vpn, _micMute, _weather, _weatherText, _netBox, _btPanel, _volPanel, _batPanel }) _icons.Children.Add(e);
         if (host != null) { Button = host; host.Content = _icons; }      // the dock: its own button (its place, click and wheel)
         else
         {
@@ -426,7 +430,7 @@ sealed class StatusParts
         _updateIcon.Visibility = V(d.UpdateRestart);
         // the symbols of Wi-Fi, Bluetooth and the volume fill less of their square than the battery: a little larger, so they look
         // as big as the icons of the apps next to them; the cable network (a full monitor) at its size (larger, it outgrew them)
-        var (glyph, connected, tip) = d.Net;
+        var (glyph, connected, tip, _) = d.Net;
         bool wifi = tip?.StartsWith("Wi-Fi", StringComparison.OrdinalIgnoreCase) == true;
         _net.FontSize = Math.Round(S.StatusIconSize * (wifi ? 1.1 : 1.0));
         _bt.FontSize = Math.Round(S.StatusIconSize * 1.1);
@@ -441,7 +445,11 @@ sealed class StatusParts
         _micMute.Visibility = V(S.ShowStatusSigns && d.MicMuted);
         _net.Glyph = glyph;
         _net.Opacity = connected ? 1 : 0.4;
-        _net.Visibility = V(S.ShowWifi);
+        // Wi-Fi and a cable at once: the Wi-Fi with a small cable sign at its lower right corner
+        _netCable.Visibility = V(d.Net.Both);
+        _netCable.FontSize = Math.Round(S.StatusIconSize * 0.55);
+        _net.Margin = d.Net.Both ? new Thickness(0, 0, Math.Round(S.StatusIconSize * 0.45), 0) : new Thickness(0);
+        _netBox.Visibility = V(S.ShowWifi);
         _ = BluetoothWatch.RecheckAsync();
         ShowBluetooth();
         var tips = new List<string> { tip };

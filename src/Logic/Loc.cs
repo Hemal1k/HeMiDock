@@ -104,6 +104,8 @@ static class L
         ["No Bluetooth adapter found."] = "Nenašel se adaptér Bluetooth.",
         ["No paired devices."] = "Žádná spárovaná zařízení.",
         ["Add device"] = "Přidat zařízení",
+        ["Available networks"] = "Dostupné sítě",
+        ["Paired – click to connect"] = "Spárováno – kliknutím připojíte",
         ["Looks for devices nearby that are ready to pair"] = "Vyhledá zařízení v okolí připravená ke spárování",
         ["Devices nearby"] = "Zařízení v okolí",
         ["Searching for devices nearby…"] = "Hledání zařízení v okolí…",

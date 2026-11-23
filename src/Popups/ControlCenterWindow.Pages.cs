@@ -91,6 +91,43 @@ sealed partial class ControlCenterWindow
         return b;
     }
 
+    /// <summary>
+    /// A row of a device or a network (Wi-Fi, Bluetooth): its symbol in a round tile – in the accent colour while connected –,
+    /// the name, a line under it and a small sign at the end (the lock of a secured network).
+    /// </summary>
+    static Button DeviceRow(string glyph, string text, bool on, Action click, string sub = null, string endGlyph = null, string backGlyph = null)
+    {
+        var tile = new Grid { Width = 32, Height = 32, VerticalAlignment = VerticalAlignment.Center };
+        tile.Children.Add(new Border { CornerRadius = new CornerRadius(16), Background = on ? Res("AccentFillColorDefaultBrush") : Res("SubtleFillColorSecondaryBrush") });
+        var fore = on ? Res("TextOnAccentFillColorPrimaryBrush") : Res("TextFillColorPrimaryBrush");
+        // the signal of a network: the whole fan faint under the bars it has
+        if (backGlyph != null) tile.Children.Add(new FontIcon { Glyph = backGlyph, FontSize = 15, Opacity = 0.35, Foreground = fore });
+        tile.Children.Add(new FontIcon { Glyph = glyph, FontSize = 15, Foreground = fore });
+        var texts = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Spacing = 1 };
+        texts.Children.Add(new TextBlock { Text = text, FontSize = 13, FontWeight = on ? Microsoft.UI.Text.FontWeights.SemiBold : Microsoft.UI.Text.FontWeights.Normal, TextTrimming = TextTrimming.CharacterEllipsis });
+        if (sub != null) texts.Children.Add(new TextBlock { Text = sub, FontSize = 11.5, Foreground = Res("TextFillColorSecondaryBrush"), TextTrimming = TextTrimming.CharacterEllipsis });
+        var grid = new Grid { ColumnSpacing = 12, ColumnDefinitions = { new ColumnDefinition { Width = GridLength.Auto }, new ColumnDefinition(), new ColumnDefinition { Width = GridLength.Auto } } };
+        grid.Children.Add(tile);
+        Grid.SetColumn(texts, 1);
+        grid.Children.Add(texts);
+        if (endGlyph != null)
+        {
+            var end = new FontIcon { Glyph = endGlyph, FontSize = 12, Foreground = Res("TextFillColorTertiaryBrush"), VerticalAlignment = VerticalAlignment.Center };
+            Grid.SetColumn(end, 2);
+            grid.Children.Add(end);
+        }
+        var b = new Button { Style = DockButton, HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Stretch, Padding = new Thickness(8, 7, 10, 7), Content = grid };
+        if (click != null) b.Click += (_, _) => click();
+        return b;
+    }
+
+    /// <summary>A small heading inside a card (Connected, Available networks).</summary>
+    static TextBlock ListHeading(string text) => new()
+    {
+        Text = L.T(text), FontSize = 11.5, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, Margin = new Thickness(10, 6, 0, 2),
+        Foreground = Res("TextFillColorSecondaryBrush")
+    };
+
     /// <summary>A turning ring with what is being looked for, while Windows searches.</summary>
     void Searching(string text) => _page.Children.Add(new StackPanel
     {
