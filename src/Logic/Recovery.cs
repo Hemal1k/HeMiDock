@@ -163,6 +163,7 @@ static class PinTransfer
         Host.Backup = SettingsBackup.Save;
         Host.AddPins = AddTo;
         Host.HasPins = In;
+        Host.DescribePins = Describe;
         Host.ApplyPins = Apply;
     }
 
@@ -201,28 +202,113 @@ static class PinTransfer
     public static bool In(JsonElement root) =>
         root.ValueKind == JsonValueKind.Object && (root.TryGetProperty(DockKey, out _) || root.TryGetProperty(StartKey, out _));
 
+    static string Local(string path) =>
+        path == null ? null
+        : path.StartsWith(Own, StringComparison.OrdinalIgnoreCase) ? AppPaths.Folder + path[Own.Length..]
+        : path.StartsWith(Home, StringComparison.OrdinalIgnoreCase) ? Profile + path[Home.Length..]
+        : path;
+
+    static readonly string[] ImageTypes = { ".png", ".ico", ".jpg", ".jpeg", ".bmp", ".gif" };
+
+    /// <summary>
+    /// What of a file in an import may be written into the app's folder (null = nothing): pictures (own icons, icons of web
+    /// pins) as they are, a web pin (.url) only made again from its http / https address, a shortcut taken over from the
+    /// taskbar (.lnk) only in the Pinned folder – its target is shown before the import. Programs, libraries and scripts never.
+    /// </summary>
+    internal static byte[] Allowed(string path, byte[] bytes, string pinnedFolder)
+    {
+        string ext = Path.GetExtension(path).ToLowerInvariant();
+        if (ImageTypes.Contains(ext)) return bytes;
+        if (ext == ".lnk")
+            return string.Equals(Path.GetDirectoryName(path), pinnedFolder, StringComparison.OrdinalIgnoreCase) ? bytes : null;
+        if (ext != ".url") return null;
+        string url = System.Text.Encoding.UTF8.GetString(bytes).Split('\n').Select(l => l.Trim())
+            .FirstOrDefault(l => l.StartsWith("URL=", StringComparison.OrdinalIgnoreCase))?[4..];
+        return Uri.TryCreate(url, UriKind.Absolute, out var u) && (u.Scheme == Uri.UriSchemeHttp || u.Scheme == Uri.UriSchemeHttps)
+            ? System.Text.Encoding.UTF8.GetBytes("[InternetShortcut]\r\nURL=" + u.AbsoluteUri + "\r\n") : null;
+    }
+
+    /// <summary>The files of an export that may go into the app's folder: where (the path on this PC) and what.</summary>
+    static List<(string Path, byte[] Bytes)> FilesOf(JsonElement root)
+    {
+        var list = new List<(string, byte[])>();
+        if (!root.TryGetProperty(FilesKey, out var files) || files.ValueKind != JsonValueKind.Object) return list;
+        foreach (var f in files.EnumerateObject())
+        {
+            try
+            {
+                // only into the app's own folder, whatever the name in the file says
+                string path = Path.GetFullPath(Local(f.Name));
+                if (!f.Name.StartsWith(Own, StringComparison.OrdinalIgnoreCase) || !Under(path, AppPaths.Folder)) continue;
+                if (Allowed(path, Convert.FromBase64String(f.Value.GetString() ?? ""), AppPaths.Of("Pinned")) is { } bytes) list.Add((path, bytes));
+                else Log.Note("PinTransfer", "not taken over: " + f.Name);
+            }
+            catch (Exception ex) { Log.Write("PinTransfer " + f.Name, ex); }
+        }
+        return list;
+    }
+
+    /// <summary>
+    /// What the pins of an export start, one line each (shown before they are taken over): the name and the program or path
+    /// with its arguments, for a shortcut of the file also where it leads.
+    /// </summary>
+    public static string Describe(JsonElement root)
+    {
+        var files = FilesOf(root).ToDictionary(f => f.Path, f => f.Bytes, StringComparer.OrdinalIgnoreCase);
+        string temp = Path.Combine(Path.GetTempPath(), "HeMiDock-import-" + Guid.NewGuid().ToString("N"));
+        var lines = new List<string>();
+        string Show(string path, string args)
+        {
+            string local = Local(path), text = (local + " " + args).Trim();
+            if (local == null || !local.EndsWith(".lnk", StringComparison.OrdinalIgnoreCase) || !files.TryGetValue(Path.GetFullPath(local), out var bytes)) return text;
+            try
+            {
+                // the shortcut of the file: where it leads, read from a copy in a folder of its own
+                Directory.CreateDirectory(temp);
+                string copy = Path.Combine(temp, Path.GetFileName(local));
+                File.WriteAllBytes(copy, bytes);
+                var (target, targetArgs, appId) = AppShell.ResolveShortcut(copy);
+                string to = target != null ? (target + " " + targetArgs).Trim() : appId != null ? "shell:AppsFolder\\" + appId : "?";
+                return text + " → " + to;
+            }
+            catch { return text; }
+        }
+        void Line(string name, string what)
+        {
+            if (string.IsNullOrWhiteSpace(what)) return;
+            string line = "• " + (string.IsNullOrWhiteSpace(name) ? "" : name + ": ") + what;
+            if (!lines.Contains(line)) lines.Add(line);
+        }
+        try
+        {
+            if (root.TryGetProperty(DockKey, out var dock) && dock.ValueKind == JsonValueKind.Array)
+                foreach (var p in dock.Deserialize<List<PinnedApp>>() ?? new())
+                    if (!p.Spacer) Line(p.Name, p.AppId is { Length: > 0 } id ? "shell:AppsFolder\\" + id : Show(p.Path, p.Arguments));
+            if (root.TryGetProperty(StartKey, out var start) && start.ValueKind == JsonValueKind.Array)
+                foreach (var key in start.Deserialize<List<string>>() ?? new()) Line(null, Show(key, null));
+            if (root.TryGetProperty(StartOwnKey, out var own) && own.ValueKind == JsonValueKind.Object)
+                foreach (var look in (own.Deserialize<Dictionary<string, StartPins.OwnLook>>() ?? new()).Values)
+                    foreach (var item in look.Items ?? new()) Line(look.Name, Show(item, null));
+        }
+        catch (Exception ex) { Log.Write("PinTransfer describe", ex); }
+        finally { try { if (Directory.Exists(temp)) Directory.Delete(temp, true); } catch { } }
+        const int Most = 30;
+        if (lines.Count > Most) lines = lines.Take(Most).Append(L.T("… and {0} more", lines.Count - Most)).ToList();
+        return string.Join("\n", lines);
+    }
+
     /// <summary>Takes over the pins of an export instead of the current ones (their files go into the app's folder).</summary>
     public static void Apply(JsonElement root)
     {
-        string Local(string path) =>
-            path == null ? null
-            : path.StartsWith(Own, StringComparison.OrdinalIgnoreCase) ? AppPaths.Folder + path[Own.Length..]
-            : path.StartsWith(Home, StringComparison.OrdinalIgnoreCase) ? Profile + path[Home.Length..]
-            : path;
-
-        if (root.TryGetProperty(FilesKey, out var files) && files.ValueKind == JsonValueKind.Object)
-            foreach (var f in files.EnumerateObject())
+        foreach (var (path, bytes) in FilesOf(root))
+        {
+            try
             {
-                try
-                {
-                    // only into the app's own folder, whatever the name in the file says
-                    string path = Path.GetFullPath(Local(f.Name));
-                    if (!f.Name.StartsWith(Own, StringComparison.OrdinalIgnoreCase) || !Under(path, AppPaths.Folder)) continue;
-                    Directory.CreateDirectory(Path.GetDirectoryName(path));
-                    File.WriteAllBytes(path, Convert.FromBase64String(f.Value.GetString() ?? ""));
-                }
-                catch (Exception ex) { Log.Write("PinTransfer " + f.Name, ex); }
+                Directory.CreateDirectory(Path.GetDirectoryName(path));
+                File.WriteAllBytes(path, bytes);
             }
+            catch (Exception ex) { Log.Write("PinTransfer " + path, ex); }
+        }
 
         if (root.TryGetProperty(DockKey, out var dock) && dock.ValueKind == JsonValueKind.Array)
         {

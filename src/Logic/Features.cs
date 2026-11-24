@@ -184,14 +184,14 @@ static class Weather
     /// <summary>A place found by the service: "Praha, Hlavní město Praha, Česko" and where it is.</summary>
     public sealed record Place(string Label, double Lat, double Lon);
 
-    /// <summary>Places whose name starts with the text (in Czech), for the suggestions of the settings.</summary>
+    /// <summary>Places whose name starts with the text (in the language of the app), for the suggestions of the settings.</summary>
     public static async Task<List<Place>> SearchAsync(string name, int count = 8)
     {
         var list = new List<Place>();
         if (string.IsNullOrWhiteSpace(name) || name.Trim().Length < 2) return list;
         try
         {
-            using var found = JsonDocument.Parse(await Http.GetStringAsync($"https://geocoding-api.open-meteo.com/v1/search?count={count}&language=cs&name={Uri.EscapeDataString(name.Trim())}"));
+            using var found = JsonDocument.Parse(await Http.GetStringAsync($"https://geocoding-api.open-meteo.com/v1/search?count={count}&language={(L.IsCzech ? "cs" : "en")}&name={Uri.EscapeDataString(name.Trim())}"));
             if (!found.RootElement.TryGetProperty("results", out var results)) return list;
             foreach (var r in results.EnumerateArray())
             {

@@ -21,7 +21,7 @@ sealed partial class SettingsWindow
     void GeneralUpdates(StackPanel general)
     {
         ToggleRow(general, "Check for updates automatically", null, nameof(DockSettings.CheckUpdates));
-        var install = ToggleRow(general, "Install updates automatically", "A new version found is installed at once – the dock starts again", nameof(DockSettings.InstallUpdates));
+        var install = ToggleRow(general, "Install updates automatically", "In the background, without the window of the installer – the dock starts again by itself", nameof(DockSettings.InstallUpdates));
         Depends(install, () => DockSettings.Current.CheckUpdates && Updater.Installed);
         var check = new Button { Content = L.T("Check now") };
         var checkText = new TextBlock { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 12, 0), Foreground = ThemeBrush.Get("TextFillColorSecondaryBrush") };
@@ -70,7 +70,7 @@ sealed partial class SettingsWindow
         bool hasBattery = Native.GetSystemPowerStatus(out var powerNow) && powerNow.BatteryFlag != 128 && powerNow.BatteryLifePercent != 255;
         ChoiceRow(general, "Lighter drawing", "Solid panels without shadows, frosted glass and animations", nameof(DockSettings.LowGraphicsChoice),
             hasBattery ? new[] { "Off", "On", "With a low battery" } : new[] { "Off", "On" });
-        Depends(AddHint(general, "On by itself: the graphics card of this PC probably cannot draw the transparency."), () => DockSettings.LegacyGpu);
+        Depends(AddHint(general, "Turned on automatically: this PC's graphics card probably can't render transparency."), () => DockSettings.LegacyGpu);
         ChoiceRow(general, "Notification position", "At the clock, top right with the top bar", nameof(DockSettings.ToastPosition),
             "Automatic", "At the clock", "Top right", "Top left", "Bottom right", "Bottom left");
         Header(general, "Updates");
@@ -86,7 +86,7 @@ sealed partial class SettingsWindow
         Header(general, "Colors and effects");
         ChoiceRow(general, "App theme", null, nameof(DockSettings.ThemeMode), "Automatic", "Light", "Dark");
         // the mode of Windows itself: light or dark at once, or by the time of day
-        ChoiceRow(general, "Windows theme", null, nameof(DockSettings.OsTheme), "Light", "Dark", "Sunrise and sunset", "Own interval");
+        ChoiceRow(general, "Windows theme", null, nameof(DockSettings.OsTheme), "Light", "Dark", "Sunrise and sunset", "Custom interval");
         Depends(Card(general, "Light from", null, TimeBox(nameof(DockSettings.OsThemeLightAt))), () => c.OsThemeSchedule == 2);
         Depends(Card(general, "Dark from", null, TimeBox(nameof(DockSettings.OsThemeDarkAt))), () => c.OsThemeSchedule == 2);
         ChoiceRow(general, "Color palette", null, nameof(DockSettings.AccentMode), "Automatic", "Custom");
@@ -120,7 +120,7 @@ sealed partial class SettingsWindow
             ZoneEditor.Remove(own);
             OwnZonesChanged();
         };
-        Depends(Card(windows, "Own zone layouts", "Edit and Remove change the layout chosen above",
+        Depends(Card(windows, "Custom zone layouts", "Edit and Remove change the layout chosen above",
             new StackPanel { Orientation = Orientation.Horizontal, Children = { zonesNew, zonesEdit, zonesRemove } }), () => c.ZonesOn);
         Header(windows, "List of workspaces");
         var spaceName = new TextBox { Width = 220, VerticalAlignment = VerticalAlignment.Center };
@@ -199,7 +199,7 @@ sealed partial class SettingsWindow
         // the menu of the Start button (right click, Win + X): on the page of the bar the Start button is in now – the dock, or
         // the top bar while it is on. The items of "Shut down or sign out" are the one list of the power button of Start.
         var powerIds = new HashSet<string>(StartSide.Power.SelectMany(g => g).Select(p => p.Id));
-        var powerMenuPage = OrderedItemsPage("Right click on Start or Win+X. The items of \"Shut down or sign out\" are the same as those of the power button of Start. The arrows change the order in the menu.",
+        var powerMenuPage = OrderedItemsPage("Right-click Start or press Win+X. The items of \"Shut down or sign out\" are the same as those of the power button of Start. The arrows change the order in the menu.",
             // in the order of the menu: the tools, the power items, Desktop
             () => PowerMenu.Ordered().Where(g => g.All(e => e.Id != "Desktop")).Select(g => g.Select(e => e.Id))
                 .Concat(StartSide.OrderedPower().Select(g => g.Select(p => p.Id)))
@@ -255,9 +255,9 @@ sealed partial class SettingsWindow
         Header(dock, "Items on the dock");
         ToggleRow(dock, "Start button", null, nameof(DockSettings.ShowStartButton));
         Depends(ChoiceRow(dock, "Start button look", null, nameof(DockSettings.StartIconLook),
-            "Default", "Default, monochrome", "App grid", "App grid, monochrome", "Own image"), () => c.ShowStartButton);
-        Depends(PictureRow(dock, "Own image", null), () => c.ShowStartButton && c.StartIconLook == 4);
-        Depends(NavRow(dock, "Start button menu", "Right click on Start or Win+X",
+            "Default", "Default, monochrome", "App grid", "App grid, monochrome", "Custom image"), () => c.ShowStartButton);
+        Depends(PictureRow(dock, "Custom image", null), () => c.ShowStartButton && c.StartIconLook == 4);
+        Depends(NavRow(dock, "Start button menu", "Right-click Start or press Win+X",
             () => ShowSubPage(dockIndex, "Start button menu", powerMenuPage)), () => !c.TopBarOn);
         // not in the dock while the top bar is on (it has its own search)
         ToggleRow(dock, "Search button", null, nameof(DockSettings.ShowSearchButtons));
@@ -284,11 +284,11 @@ sealed partial class SettingsWindow
         Depends(ToggleRow(bar, "Name of the active app", null, nameof(DockSettings.TopBarAppName)), () => c.TopBarOn);
         Depends(ToggleRow(bar, "System menu", null, nameof(DockSettings.TopBarSystemMenu)), () => c.TopBarOn);
         Depends(ToggleRow(bar, "System menu instead of Start", null, nameof(DockSettings.TopBarSystemStart)), () => c.TopBarOn && c.TopBarSystemMenu);
-        Depends(NavRow(bar, "Start button menu", "Right click on Start or Win+X",
+        Depends(NavRow(bar, "Start button menu", "Right-click Start or press Win+X",
             () => ShowSubPage(barIndex, "Start button menu", powerMenuPage)), () => c.TopBarOn);
         Depends(SliderRow(bar, "Height", null, nameof(DockSettings.TopBarHeight), 24, 44, 1, "{0:0} px"), () => c.TopBarOn);
         Depends(ToggleRow(bar, "Automatically hide the top bar", null, nameof(DockSettings.TopBarAutoHide)), () => c.TopBarOn);
-        Depends(AddHint(bar, "Double click on an empty place: maximize the window. Mouse wheel: volume control."), () => c.TopBarOn);
+        Depends(AddHint(bar, "Double-click an empty area: maximize the window. Mouse wheel: volume control."), () => c.TopBarOn);
 
         var start = NewPage("Start menu", "\uE700", "start");
         ToggleRow(start, "Start menu", null, nameof(DockSettings.ReplaceStartMenu));
@@ -310,10 +310,10 @@ sealed partial class SettingsWindow
             StartSide.Places.Select(g => g.Select(p => p.Id)), StartSide.IsPlaceShown, StartSide.SetPlaceShown);
         Only(NavRow(start, "Start menu side column", "Folders and links",
             () => ShowSubPage(startIndex, "Start menu side column", sidePage)), 1);
-        var startPowerPage = OrderedItemsPage("Shut down, restart, lock …",
+        var startPowerPage = OrderedItemsPage("Shut down, restart, lock…",
             () => StartSide.OrderedPower().Select(g => g.Select(p => p.Id)), StartSide.IsPowerShown, StartSide.SetPowerShown, StartSide.MovePower);
         // one list for the power button of Start and the Start button menu (Win + X)
-        NavRow(start, "Items of the power button", "Shut down, restart, lock … – in Start and in the Start button menu",
+        NavRow(start, "Items of the power button", "Shut down, restart, lock… – in Start and in the Start button menu",
             () => ShowSubPage(startIndex, "Items of the power button", startPowerPage));
         _subPages[sidePage] = (startIndex, "Start menu side column");          // their items can be found by the search too
         _subPages[startPowerPage] = (startIndex, "Items of the power button");
@@ -326,7 +326,7 @@ sealed partial class SettingsWindow
         Header(right, "System tray");
         ToggleRow(right, "System tray icons", null, nameof(DockSettings.ShowTrayArea));
         int rightIndex = _pages.Count - 1;
-        Depends(NavRow(right, "Choice of icons", "Which apps show their icon at all",
+        Depends(NavRow(right, "Choice of icons", "Apps that can show an icon",
             () => ShowSubPage(rightIndex, "Choice of icons", TrayIconsPage())), () => c.ShowTrayArea);
         AddHint(right, "Drag an icon onto the arrow or back to hide or show it (or Ctrl + click).");
         Header(right, "Status icons");
@@ -337,7 +337,7 @@ sealed partial class SettingsWindow
         ToggleRow(right, "Windows Security", "Shield of Microsoft Defender with its state; its icon in the notification area is hidden", nameof(DockSettings.ShowSecurity));
         ToggleRow(right, "Network", null, nameof(DockSettings.ShowWifi));
         Depends(ToggleRow(right, "Bluetooth", null, nameof(DockSettings.ShowBluetooth)), () => App.HasBluetooth);   // only on devices with Bluetooth
-        Depends(ToggleRow(right, "Charge of Bluetooth devices", "On the top bar – next to the Bluetooth icon", nameof(DockSettings.ShowBluetoothBattery)),
+        Depends(ToggleRow(right, "Bluetooth device battery", "On the top bar – next to the Bluetooth icon", nameof(DockSettings.ShowBluetoothBattery)),
             () => App.HasBluetooth && c.ShowBluetooth && c.TopBarOn);
         ToggleRow(right, "Volume", null, nameof(DockSettings.ShowVolume));
         Depends(ToggleRow(right, "Volume level", null, nameof(DockSettings.ShowVolumePercent)), () => c.ShowVolume);
@@ -353,8 +353,8 @@ sealed partial class SettingsWindow
         Header(right, "Weather");
         ToggleRow(right, "Weather", "From the service Open-Meteo; the name of the city is sent to it", nameof(DockSettings.WeatherOn));
         Depends(CityRow(right, "City"), () => c.WeatherOn);
-        Header(right, "Signs");
-        ToggleRow(right, "Status signs", "Do not disturb, VPN, muted microphone, restart for updates", nameof(DockSettings.ShowStatusSigns));
+        Header(right, "Indicators");
+        ToggleRow(right, "Status indicators", "Do not disturb, VPN, muted microphone, restart for updates", nameof(DockSettings.ShowStatusSigns));
         ToggleRow(right, "Caps Lock", null, nameof(DockSettings.ShowCapsLock));
         ToggleRow(right, "Num Lock", null, nameof(DockSettings.ShowNumLock));
         Header(right, "System monitor");
@@ -374,7 +374,7 @@ sealed partial class SettingsWindow
         Header(clock, "Date");
         Depends(ToggleRow(clock, "Show date", null, nameof(DockSettings.ShowDate)), () => c.ShowClock);
         Depends(ChoiceRow(clock, "Date format", null, nameof(DockSettings.DateMode),
-            "Weekday and date", "Long ", "Short ", "Custom"), () => c.ShowClock && c.ShowDate);
+            "Weekday and date", "Long", "Short", "Custom"), () => c.ShowClock && c.ShowDate);
         Depends(ChoiceRow(clock, "Order of day and month", null, nameof(DockSettings.DateOrder), "Automatic", "Day first (10. 11.)", "Month first (11/10)"),
             () => c.ShowClock && c.ShowDate && c.DateMode != 3);
         Depends(TextRow(clock, "Custom format", "e.g. d MMM yyyy · dddd d. MMMM · MM/dd/yyyy", nameof(DockSettings.CustomDateFormat)),
@@ -384,7 +384,9 @@ sealed partial class SettingsWindow
         Header(clock, "Calendar");
         ChoiceRow(clock, "Calendar data", null, nameof(DockSettings.CalendarSource), "Calendar only", "Outlook", "Internet calendar (.ics)");
         Depends(AddHint(clock, "Classic Outlook was not found. The new Outlook cannot be read – publish its calendar and use the internet calendar."), () => c.CalendarSource == 1 && !OutlookCalendar.Available);
-        Depends(TextRow(clock, "Address of the calendar", "https://… or a file .ics", nameof(DockSettings.CalendarIcs)), () => c.CalendarSource == 2);
+        Depends(TextRow(clock, "Address of the calendar", "https://… or an .ics file", nameof(DockSettings.CalendarIcs)), () => c.CalendarSource == 2);
+        Depends(AddHint(clock, "Addresses with http:// are not read because they are not encrypted. Use the https:// or webcal:// address of the calendar."),
+            () => c.CalendarSource == 2 && IcsCalendar.IsPlainHttp(c.CalendarIcs));
         var calendars = new Button { Content = L.T("Choose…") };
         calendars.Click += async (_, _) =>
         {
@@ -451,8 +453,11 @@ sealed partial class SettingsWindow
         Header(about, "Diagnostics");
         ToggleRow(about, "Debug mode", null, nameof(DockSettings.DebugMode));
         var export = new Button { Content = L.T("Save to desktop") };
-        export.Click += (_, _) =>
+        export.Click += async (_, _) =>
         {
+            if (!await Dialogs.Confirm(this, L.T("Diagnostic data"),
+                L.T("The zip file contains the logs and settings of HeMiDock, a description of this PC and its monitors, the list of running processes and the paths of apps and files opened from the dock. The address of the internet calendar is hidden and your user folder is shortened to %USERPROFILE%. Please check it before you share it."),
+                L.T("Save"))) return;
             string zip = Diag.Export();
             if (zip != null) Fg.Run("explorer.exe", $"/select,\"{zip}\"");
             else _ = Dialogs.Info(this, L.T("Diagnostic data"), L.T("The diagnostic data could not be saved."));
@@ -474,7 +479,7 @@ sealed partial class SettingsWindow
         "Corner radius", "Shadow", "Width of the magnification under the mouse", "Magnify only inside the dock", "Padding at the ends", "Icon spacing", "App icon size",
         "Size of the Start, Search and Task view icons", "Divide the parts of the dock", "Click and launch animation", "Animation speed", "Transparency intensity",
         "In low battery mode", "Hide after", "Only when a window covers it", "Font size", "Arrangement", "Custom format", "Week numbers",
-        "First day of the week", "Caps Lock", "Num Lock", "Status signs", "Removable drives",
+        "First day of the week", "Caps Lock", "Num Lock", "Status indicators", "Removable drives",
         "Win + number", "Length of the dock", "Widening spreads the icons", "Distance from the screen edge", "Icon size in the Start menu", "Notification position"
         // the lists of the Start menu (side column, power button, Win + X menu) are always shown: without edit mode there was
         // no way to find where the Win + X menu is changed

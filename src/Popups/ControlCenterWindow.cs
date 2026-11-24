@@ -238,7 +238,7 @@ sealed partial class ControlCenterWindow : PopupWindow
                 case "battery": if (StatusInfo.Battery() is { } b) _main.Children.Add(Part(BatteryCard(b), id)); break;
                 case "media":
                     if (BarMedia.Now.Title is { Length: > 0 }) _main.Children.Add(Part(MediaCard(), id));
-                    else if (_editing) _main.Children.Add(Part(Card(Title(L.T("Now playing"))), id));   // nothing plays: an empty part to move / hide
+                    else if (_editing) _main.Children.Add(Part(Card(Title(L.T("Media playback"))), id));   // nothing plays: an empty part to move / hide
                     break;
             }
 
@@ -378,7 +378,7 @@ sealed partial class ControlCenterWindow : PopupWindow
         button.Click += (_, _) => tile.Click();
         if (id == "net") button.RightTapped += (_, e) => { e.Handled = true; Open(_wifi != null ? "ms-settings:network-wifi" : "ms-settings:network"); };
         if (id == "bt") button.RightTapped += (_, e) => { e.Handled = true; Open("ms-settings:bluetooth"); };
-        if (id == "cell") { button.RightTapped += (_, e) => { e.Handled = true; Open("ms-settings:network-cellular"); }; ToolTipService.SetToolTip(button, L.T("Right click: SIM and eSIM settings")); }
+        if (id == "cell") { button.RightTapped += (_, e) => { e.Handled = true; Open("ms-settings:network-cellular"); }; ToolTipService.SetToolTip(button, L.T("Right-click: SIM and eSIM settings")); }
         return button;
     }
 

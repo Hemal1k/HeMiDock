@@ -252,7 +252,8 @@ static class Diag
     public static void SettingChanged(string name, object value)
     {
         if (!On) return;
-        string text = value?.ToString() ?? "null";
+        // the address of the internet calendar often has a private key in it
+        string text = name == nameof(DockSettings.CalendarIcs) ? "<hidden>" : value?.ToString() ?? "null";
         Write("Setting", $"{name} = {(text.Length > 120 ? text[..120] + "…" : text)}");
     }
 
@@ -335,10 +336,9 @@ static class Diag
                 {
                     var ext = Path.GetExtension(file).ToLowerInvariant();
                     if (ext is not (".txt" or ".json") || new FileInfo(file).Length > 16 * 1024 * 1024) continue;
-                    // the log may be written right now – copied through a shared read
-                    using var src = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
-                    using var dst = archive.CreateEntry(prefix + Path.GetFileName(file)).Open();
-                    src.CopyTo(dst);
+                    // the log may be written right now – read through a shared read
+                    using var src = new StreamReader(new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete));
+                    Add(archive, prefix + Path.GetFileName(file), src.ReadToEnd());
                 }
             }
             Add(archive, "system.txt", SystemInfo());
@@ -356,7 +356,24 @@ static class Diag
     static void Add(ZipArchive archive, string name, string text)
     {
         using var w = new StreamWriter(archive.CreateEntry(name).Open(), new UTF8Encoding(true));
-        w.Write(text);
+        w.Write(Anonymize(text, DockSettings.Current?.CalendarIcs, Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)));
+    }
+
+    /// <summary>
+    /// For the diagnostic data: the address of the internet calendar hidden (it often has a private key in it), the user
+    /// folder (with the user name) written as %USERPROFILE% – also in the JSON of the settings, where \ is doubled.
+    /// </summary>
+    internal static string Anonymize(string text, string calendar, string profile)
+    {
+        if (string.IsNullOrEmpty(text)) return text;
+        const System.Text.RegularExpressions.RegexOptions Ci = System.Text.RegularExpressions.RegexOptions.IgnoreCase;
+        text = System.Text.RegularExpressions.Regex.Replace(text, "(\"CalendarIcs\"\\s*:\\s*)\"(?:[^\"\\\\]|\\\\.)*\"", "$1\"<hidden>\"");
+        text = System.Text.RegularExpressions.Regex.Replace(text, @"(CalendarIcs = )[^\r\n]*", "$1<hidden>");   // older debug logs
+        if (!string.IsNullOrWhiteSpace(calendar)) text = text.Replace(calendar.Trim(), "<hidden>", StringComparison.OrdinalIgnoreCase);
+        if (!string.IsNullOrEmpty(profile))
+            foreach (var form in new[] { profile.Replace("\\", "\\\\"), profile, profile.Replace('\\', '/') })
+                text = System.Text.RegularExpressions.Regex.Replace(text, System.Text.RegularExpressions.Regex.Escape(form) + @"(?![\w.-])", "%USERPROFILE%", Ci);
+        return text;
     }
 
     /// <summary>

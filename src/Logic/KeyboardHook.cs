@@ -86,7 +86,7 @@ static class KeyboardHook
         if (_hook != IntPtr.Zero) return;
         _proc = Callback;
         _hook = Native.SetWindowsHookEx(WH_KEYBOARD_LL, _proc, Native.GetModuleHandle(null), 0);
-        if (_hook == IntPtr.Zero) Log.Write("KeyboardHook", new InvalidOperationException("SetWindowsHookEx selhalo: " + Marshal.GetLastWin32Error()));
+        if (_hook == IntPtr.Zero) Log.Write("KeyboardHook", new InvalidOperationException("SetWindowsHookEx failed: " + Marshal.GetLastWin32Error()));
         _winDown = _combo = _mask = false;
         _swallowed = 0;
     }

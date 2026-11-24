@@ -94,7 +94,7 @@ sealed class TopBarWindow : Window, IPanelWindow
 
         // right: what is playing and the system monitor on capsules, the system buttons, the widgets of the control center
         var note = new FontIcon { Glyph = "", FontSize = 12, Margin = new Thickness(0, 0, 8, 0) };
-        _media = Capsule(new StackPanel { Orientation = Orientation.Horizontal, Children = { note, _mediaText, _mediaPlay } }, L.T("Play / pause – right click: previous / next"), async () => await BarMedia.PlayPauseAsync());
+        _media = Capsule(new StackPanel { Orientation = Orientation.Horizontal, Children = { note, _mediaText, _mediaPlay } }, L.T("Play / pause – right-click: previous / next"), async () => await BarMedia.PlayPauseAsync());
         ((Button)_media.Child).RightTapped += (_, e) =>
         {
             e.Handled = true;

@@ -440,7 +440,7 @@ sealed class SetupWindow : Window
                 Item("", "Quick search – Alt + Space", "Apps, files, settings, calculations and conversions like 100 EUR in CZK. Paths like %appdata% open in Explorer."),
                 Item("", "Start – the Win key", "Drag apps to change their order, drop one on another to make a group, or on an empty place to remove it. Win + S starts searching, Win + X opens the system menu."),
                 Item("", "Advanced editing – Settings → General", "Move the parts of the dock and the top bar and change their size with the mouse. Rename apps in Start and change their icons."),
-                Item("", "Icons in the dock", "Right click: windows, recent files, pinning. The mouse wheel switches between the windows of an app."),
+                Item("", "Icons in the dock", "Right-click: windows, recent files, pinning. The mouse wheel switches between the windows of an app."),
                 Item("", "Control center and calendar", "A click on the status icons or the clock. Wi-Fi, sound, Do not disturb, VPN and notifications; the calendar can show Outlook appointments."),
                 Item("", "Keyboard shortcuts", "Settings → Keyboard shortcuts: your own keys for the control center, calendar, mute, Do not disturb and more."),
                 Item("", "Everything can be changed", "Settings: look of the dock, top bar, status icons, Start and search. Settings can be exported to another PC together with pinned apps."),

@@ -100,7 +100,8 @@ static class Program
     {
         const ushort major = Microsoft.WindowsAppSDK.Runtime.Version.Major, minor = Microsoft.WindowsAppSDK.Runtime.Version.Minor;
         string need = $"{major}.{minor}.{Microsoft.WindowsAppSDK.Runtime.Version.Build}";
-        bool cs = System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "cs";
+        // before WinUI and the settings: the language of Windows, as L.Apply does (Slovak reads the Czech texts too)
+        bool cs = System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName is "cs" or "sk";
         string ask = cs
             ? $"HeMiDock potřebuje Windows App Runtime {need} nebo novější od Microsoftu a na tomto PC chybí (nebo je starší).\n\nStáhnout a nainstalovat ho teď? Trvá to chvilku, pak se HeMiDock spustí."
             : $"HeMiDock needs the Windows App Runtime {need} or newer from Microsoft, and this PC lacks it (or has an older one).\n\nDownload and install it now? It takes a moment, then HeMiDock starts.";
@@ -108,13 +109,19 @@ static class Program
         if (MessageBoxW(0, ask, "HeMiDock", 0x4 | 0x20 | 0x10000) != 6) return false;
         string arch = System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture == System.Runtime.InteropServices.Architecture.Arm64 ? "arm64" : "x64";
         string url = $"https://aka.ms/windowsappsdk/{major}.{minor}/latest/windowsappruntimeinstall-{arch}.exe";
-        string file = Path.Combine(Path.GetTempPath(), $"windowsappruntimeinstall-{arch}.exe");
+        // a new folder of its own in %TEMP%: no file put there before can be started instead
+        string dir = Path.Combine(Path.GetTempPath(), "HeMiDock-runtime-" + Guid.NewGuid().ToString("N"));
+        string file = Path.Combine(dir, $"windowsappruntimeinstall-{arch}.exe");
         try
         {
+            Directory.CreateDirectory(dir);
             using (var http = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromMinutes(10) })
             using (var s = http.GetStreamAsync(url).GetAwaiter().GetResult())
             using (var f = File.Create(file))
                 s.CopyTo(f);
+            // started only with a valid signature of Microsoft (a changed download, a wrong redirect)
+            if (!Authenticode.IsMicrosoft(file))
+                throw new InvalidOperationException(cs ? "stažený soubor nemá platný podpis od Microsoftu." : "the downloaded file has no valid signature of Microsoft.");
             using var p = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(file, "--quiet") { UseShellExecute = false, CreateNoWindow = true });
             p?.WaitForExit();
             return true;
@@ -122,14 +129,14 @@ static class Program
         catch (Exception e)
         {
             string fail = cs
-                ? $"Windows App Runtime se nepodařilo nainstalovat: {e.Message}\n\nStáhni ho ručně: https://learn.microsoft.com/windows/apps/windows-app-sdk/downloads"
+                ? $"Windows App Runtime se nepodařilo nainstalovat: {e.Message}\n\nStáhněte ho ručně: https://learn.microsoft.com/windows/apps/windows-app-sdk/downloads"
                 : $"The Windows App Runtime could not be installed: {e.Message}\n\nGet it by hand: https://learn.microsoft.com/windows/apps/windows-app-sdk/downloads";
             MessageBoxW(0, fail, "HeMiDock", 0x10 | 0x10000);
             return false;
         }
         finally
         {
-            try { File.Delete(file); } catch { }
+            try { Directory.Delete(dir, true); } catch { }
         }
     }
 #endif

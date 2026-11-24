@@ -144,6 +144,12 @@ static class ShellHost
             if (Environment.TickCount64 - _openCheckedAt >= 500)
             {
                 _openCheckedAt = Environment.TickCount64;
+                // every 2 s: windows that became taskbar windows without an event (Remote Desktop) are taken in
+                if (_openCheckedAt - _sweptAt >= 2000)
+                {
+                    _sweptAt = _openCheckedAt;
+                    try { _shell?.TasksService.Sweep(); } catch (Exception ex) { Log.Write("Sweep", ex); }
+                }
                 var now = Windows().Where(IsOpen).Select(w => w.Handle).ToHashSet();
                 if (!now.SetEquals(_open)) { _open = now; _openVersion++; }
             }
@@ -151,6 +157,7 @@ static class ShellHost
         }
     }
     static int _openVersion;
+    static long _sweptAt;
 
     /// <summary>The windows of the taskbar with what the apps report on them (Store apps included, unlike a plain list of windows).</summary>
     public static List<TaskWindow> TaskWindows() => Windows()

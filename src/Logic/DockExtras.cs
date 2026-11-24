@@ -13,7 +13,7 @@ static class QuickLayout
     /// <summary>Parts of the control center (id, name) in the default order.</summary>
     public static readonly (string Id, string Name)[] Sections =
     {
-        ("tiles", "Quick buttons"), ("brightness", "Display"), ("sound", "Sound"), ("media", "Now playing"), ("power", "Power mode"), ("battery", "Battery")
+        ("tiles", "Quick buttons"), ("brightness", "Display"), ("sound", "Sound"), ("media", "Media playback"), ("power", "Power mode"), ("battery", "Battery")
     };
 
     /// <summary>Quick buttons (id, name) in the default order (two per row).</summary>
@@ -101,7 +101,7 @@ static class QuickLayout
 }
 
 /// <summary>
-/// "Pin to Start (HeMiDock)" in the right-click menu of files and folders in Explorer (current user only). Windows does
+/// "Pin to Start" of HeMiDock in the right-click menu of files and folders in Explorer (current user only). Windows does
 /// not tell other apps about its own "Pin to Start", so HeMiDock adds its own item: it starts HeMiDock.exe --pin-start
 /// "file", which hands the file to the running dock.
 /// </summary>

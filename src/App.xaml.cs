@@ -435,6 +435,7 @@ public partial class App : Application
         Run("windows", WindowManager.Apply);
         Run("window places", WindowPlaces.Start);                         // windows Windows moved only for the dock go back
         Run("updates", Updater.Start);                                    // new versions on GitHub (once; the switch is asked each time)
+        Run("outlook", s.TakeOutlookOnce);                                // the classic Outlook found: its calendar on (once)
         Run("rules", AppRules.Apply);
         Run("weather", Weather.Apply);
         Run("clipboard", ClipboardHistory.Apply);

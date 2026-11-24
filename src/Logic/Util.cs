@@ -2,7 +2,7 @@
 
 namespace HeMiDock;
 
-/// <summary>Simple error log in %AppData%\HeMiDock\log.txt (errors only, to find out why something does not work).</summary>
+/// <summary>Simple error log in %AppData%\HeMi\HeMiDock\Logs\log.txt (errors only, to find out why something does not work).</summary>
 static class Log
 {
     static readonly object Gate = new();

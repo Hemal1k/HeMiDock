@@ -283,7 +283,6 @@ public partial class DockSettings : INotifyPropertyChanged
     public bool SearchDockSettings { get => _searchDockSettings; set => Set(ref _searchDockSettings, value); }
     /// <summary>Files and folders (Windows Search index) in the results.</summary>
     public bool SearchFiles { get => _searchFiles; set => Set(ref _searchFiles, value); }
-    /// <summary>"Pin to Start (HeMiDock)" in the right-click menu of files and folders in Explorer.</summary>
     /// <summary>Apps in the results of the search.</summary>
     public bool SearchApps { get => _searchApps; set => Set(ref _searchApps, value); }
     int _dateOrder;
@@ -627,6 +626,20 @@ public partial class DockSettings : INotifyPropertyChanged
     bool _setupDone;
     /// <summary>The guide of the first start was shown (settings of earlier versions count as done).</summary>
     public bool SetupDone { get => _setupDone; set => Set(ref _setupDone, value); }
+    bool _outlookOffered;
+    /// <summary>
+    /// The calendar was switched to the classic Outlook once because it was found (the user, 2026-11-24) – done only once,
+    /// so that "Nowhere" chosen afterwards stays.
+    /// </summary>
+    public bool OutlookOffered { get => _outlookOffered; set => Set(ref _outlookOffered, value); }
+
+    /// <summary>At the start: the classic Outlook on this PC and no source of appointments yet – its calendar is shown.</summary>
+    public void TakeOutlookOnce()
+    {
+        if (OutlookOffered) return;
+        OutlookOffered = true;
+        if (CalendarSource == 0 && OutlookCalendar.Available) CalendarSource = 1;
+    }
 
     /// <summary>Appointments of the classic Outlook in the calendar of the clock (off by default, see <see cref="OutlookCalendar"/>).</summary>
     public bool CalendarEvents => CalendarSource == 1;
@@ -919,6 +932,17 @@ public partial class DockSettings : INotifyPropertyChanged
             return Host.HasPins?.Invoke(doc.RootElement) == true;
         }
         catch { return false; }
+    }
+
+    /// <summary>What the pinned apps of an exported file start, one line each; empty without any.</summary>
+    public static string DescribePins(string file)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(File.ReadAllText(file));
+            return Host.DescribePins?.Invoke(doc.RootElement) ?? "";
+        }
+        catch { return ""; }
     }
 
     /// <summary>

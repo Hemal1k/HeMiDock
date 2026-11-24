@@ -271,8 +271,9 @@ static class IcsCalendar
         {
             if (_all == null || source != _source || Environment.TickCount64 - _at > 15 * 60_000)
             {
+                if (IsPlainHttp(source)) return null;                        // unencrypted: refused, the settings say so
                 string text = source.StartsWith("http", StringComparison.OrdinalIgnoreCase) || source.StartsWith("webcal", StringComparison.OrdinalIgnoreCase)
-                    ? await Http.GetStringAsync(System.Text.RegularExpressions.Regex.Replace(source, "^webcal", "https", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+                    ? await Http.GetStringAsync(Address(source))
                     : await File.ReadAllTextAsync(source);
                 _all = Parse(text);
                 _source = source;
@@ -289,6 +290,16 @@ static class IcsCalendar
         }
         catch (Exception ex) { Log.Write("Internet calendar", ex); return null; }
     }
+
+    /// <summary>
+    /// An address without encryption (http://): not read – the address often has a private key in it and the appointments
+    /// would go over the network readable by anyone on the way (a public Wi-Fi).
+    /// </summary>
+    public static bool IsPlainHttp(string source) => source?.Trim().StartsWith("http://", StringComparison.OrdinalIgnoreCase) == true;
+
+    /// <summary>The address that is read: webcal:// is the same calendar over https://.</summary>
+    internal static string Address(string source) =>
+        System.Text.RegularExpressions.Regex.Replace(source.Trim(), "^webcal(?=://)", "https", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
 
     static List<(string, string, DateTime, DateTime, bool, string)> Parse(string text)
     {

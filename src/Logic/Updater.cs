@@ -72,7 +72,11 @@ static class Updater
         }
     }
 
-    /// <summary>On the thread of the interface: the first check 30 s after the start, then every day (while switched on).</summary>
+    /// <summary>
+    /// On the thread of the interface: the first check 30 s after the start, then every 6 hours (while switched on). With
+    /// "Install updates automatically" a new version is installed in the background: quietly (/VERYSILENT, no window of the
+    /// installer), the dock starts again by itself.
+    /// </summary>
     public static void Start()
     {
         if (_daily != null) return;
@@ -85,7 +89,7 @@ static class Updater
         first.Tick += (_, _) => { if (DockSettings.Current.CheckUpdates && !HeMiLauncher.Present) _ = CheckAsync(quiet: true); };
         first.Start();
         _daily = queue.CreateTimer();
-        _daily.Interval = TimeSpan.FromHours(24);
+        _daily.Interval = TimeSpan.FromHours(6);
         _daily.Tick += (_, _) => { if (DockSettings.Current.CheckUpdates && !HeMiLauncher.Present) _ = CheckAsync(quiet: true); };
         _daily.Start();
         _launcher = queue.CreateTimer();
@@ -194,7 +198,7 @@ static class Updater
                     done += n;
                     // the progress on the sign of the new version and in the settings (each whole percent)
                     int percent = total > 0 ? (int)(done * 100 / total) : -1;
-                    if (percent != shown) { shown = percent; SetBusy(percent >= 0 ? L.T("Downloading HeMiDock {0} – {1} %", v, percent) : L.T("Downloading HeMiDock {0}…", v)); }
+                    if (percent != shown) { shown = percent; SetBusy(percent >= 0 ? L.T("Downloading HeMiDock {0} – {1}%", v, percent) : L.T("Downloading HeMiDock {0}…", v)); }
                 }
             }
             SetBusy(L.T("Installing HeMiDock {0}…", v));
@@ -222,7 +226,7 @@ static class Updater
         }
     }
 
-    /// <summary>What the update does now ("Downloading HeMiDock 1.9.7 – 45 %"), null when nothing.</summary>
+    /// <summary>What the update does now ("Downloading HeMiDock 1.9.7 – 45%"), null when nothing.</summary>
     public static string Busy { get; private set; }
 
     static void SetBusy(string text) => Ui.Post(() => { Busy = text; Changed?.Invoke(); });

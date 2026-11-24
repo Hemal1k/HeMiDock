@@ -55,10 +55,12 @@ WizardSizePercent=120
 CloseApplications=force
 RestartApplications=no
 LicenseFile=..\LICENSE
+; English or Czech by the language of Windows (asked only when it is neither)
+ShowLanguageDialog=auto
 
 [Languages]
-; English only
 Name: "en"; MessagesFile: "compiler:Default.isl"
+Name: "cs"; MessagesFile: "compiler:Languages\Czech.isl"
 
 [CustomMessages]
 en.Prereq=Installing what HeMiDock needs: %1
@@ -72,6 +74,19 @@ en.NeedDesc=HeMiDock needs components that are missing on this PC.
 en.NeedText=The installer downloads them directly from Microsoft and installs them (Windows asks for administrator rights). They come with Microsoft's license terms – please read them before you continue:
 en.NeedLicense=license terms
 en.NeedAccept=I accept the license terms of these components and agree to download and install them
+en.DeleteSettings=Delete the settings of HeMiDock too?%n%nKeep them to use them again when you install HeMiDock later.
+cs.Prereq=Instaluje se, co HeMiDock potřebuje: %1
+cs.PrereqFailed=%1 se nepodařilo nainstalovat. Nainstalujte ho prosím ručně a spusťte instalátor znovu:%n%2
+cs.LaunchAfter=Spustit HeMiDock
+cs.Updates=Aktualizace:
+cs.UpdateCheck=Automaticky hledat nové verze
+cs.UpdateInstall=Automaticky je instalovat (dok se restartuje)
+cs.NeedTitle=Součásti od Microsoftu
+cs.NeedDesc=HeMiDock potřebuje součásti, které na tomto počítači chybí.
+cs.NeedText=Instalátor je stáhne přímo od Microsoftu a nainstaluje (Windows se zeptá na oprávnění správce). Platí pro ně licenční podmínky Microsoftu – přečtěte si je, než budete pokračovat:
+cs.NeedLicense=licenční podmínky
+cs.NeedAccept=Souhlasím s licenčními podmínkami těchto součástí a s jejich stažením a instalací
+cs.DeleteSettings=Smazat i nastavení HeMiDocku?%n%nKdyž ho ponecháte, použije se znovu při pozdější instalaci HeMiDocku.
 
 [Files]
 ; x64, and the ARM64 build on Windows on ARM when the installer has it
@@ -210,7 +225,7 @@ end;
 
 const
   DotNetLicense = 'https://aka.ms/dotnet-license';
-  AppRuntimeLicense = 'https://www.nuget.org/packages/Microsoft.WindowsAppSDK.Runtime/2.6.5/License';
+  AppRuntimeLicense = 'https://www.nuget.org/packages/Microsoft.WindowsAppSDK.Runtime/#readme-body-tab';
 
 var
   DownloadPage: TDownloadWizardPage;
@@ -297,6 +312,20 @@ var
   Code: Integer;
 begin
   Result := Exec(FileName, Params, '', SW_HIDE, ewWaitUntilTerminated, Code) and ((Code = 0) or (Code = 3010));
+end;
+
+{ a downloaded installer runs only with a valid signature of Microsoft (Authenticode, checked by PowerShell); the path is
+  put into PowerShell in single quotes, a ' in it doubled }
+function IsMicrosoftSigned(const FileName: String): Boolean;
+var
+  Code: Integer;
+  Quoted: String;
+begin
+  Quoted := FileName;
+  StringChangeEx(Quoted, '''', '''''', True);
+  Result := Exec(ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'),
+    '-NoProfile -ExecutionPolicy Bypass -Command "$s = Get-AuthenticodeSignature -LiteralPath ''' + Quoted + '''; if ($s.Status -eq ''Valid'' -and $s.SignerCertificate.Subject -like ''*O=Microsoft Corporation*'') { exit 0 } else { exit 1 }"',
+    '', SW_HIDE, ewWaitUntilTerminated, Code) and (Code = 0);
 end;
 
 procedure OpenLink(Sender: TObject);
@@ -402,7 +431,8 @@ begin
     if NeedDotNet then
     begin
       DownloadPage.SetText(FmtMessage(CustomMessage('Prereq'), ['.NET 10 Runtime']), '');
-      if not RunElevated(ExpandConstant('{tmp}\dotnet-runtime.exe'), '/install /quiet /norestart') or not HasDotNet then
+      if not IsMicrosoftSigned(ExpandConstant('{tmp}\dotnet-runtime.exe'))
+        or not RunElevated(ExpandConstant('{tmp}\dotnet-runtime.exe'), '/install /quiet /norestart') or not HasDotNet then
       begin
         SuppressibleMsgBox(FmtMessage(CustomMessage('PrereqFailed'), ['.NET 10 Runtime (' + Arch + ')', 'https://dotnet.microsoft.com/download/dotnet/10.0']), mbError, MB_OK, IDOK);
         { a quiet install goes on without it: Windows asks for it at the start }
@@ -413,7 +443,8 @@ begin
     if NeedRuntime then
     begin
       DownloadPage.SetText(FmtMessage(CustomMessage('Prereq'), ['Windows App Runtime 2.6']), '');
-      if not RunPlain(ExpandConstant('{tmp}\windowsappruntimeinstall.exe'), '--quiet') or not HasAppRuntime then
+      if not IsMicrosoftSigned(ExpandConstant('{tmp}\windowsappruntimeinstall.exe'))
+        or not RunPlain(ExpandConstant('{tmp}\windowsappruntimeinstall.exe'), '--quiet') or not HasAppRuntime then
       begin
         SuppressibleMsgBox(FmtMessage(CustomMessage('PrereqFailed'), ['Windows App Runtime 2.6 (' + Arch + ')', 'https://learn.microsoft.com/windows/apps/windows-app-sdk/downloads']), mbError, MB_OK, IDOK);
         { a quiet install goes on without it: Windows offers it when HeMiDock starts }
@@ -437,7 +468,7 @@ begin
   Dir := ExpandConstant('{userappdata}\HeMi\HeMiDock');
   if not DirExists(Dir) then Exit;
   if UninstallSilent then Exit;
-  if MsgBox('Delete the settings of HeMiDock too?' + #13#10#13#10 + 'Keep them to use them again when you install HeMiDock later.', mbConfirmation, MB_YESNO or MB_DEFBUTTON2) = IDYES then
+  if MsgBox(CustomMessage('DeleteSettings'), mbConfirmation, MB_YESNO or MB_DEFBUTTON2) = IDYES then
   begin
     DelTree(Dir, True, True, True);
     RemoveDir(ExpandConstant('{userappdata}\HeMi'));

@@ -30,6 +30,8 @@ static class Host
     /// <summary>The pins of the dock and Start go with exported settings: add them, find them in a file, take them over.</summary>
     public static Action<Dictionary<string, object>> AddPins { get; set; }
     public static Func<JsonElement, bool> HasPins { get; set; }
+    /// <summary>What the pins of a file start, one line each (shown before an import takes them over).</summary>
+    public static Func<JsonElement, string> DescribePins { get; set; }
     public static Action<JsonElement> ApplyPins { get; set; }
     /// <summary>The settings of the app found by a text, for the search of Start.</summary>
     public static Func<string, IEnumerable<StartEntry>> SearchSettings { get; set; }

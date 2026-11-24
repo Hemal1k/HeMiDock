@@ -171,3 +171,40 @@ namespace ManagedShell.Common.SupportingClasses
         }
     }
 }
+
+namespace ManagedShell.WindowsTasks
+{
+    using System.Linq;
+    using static ManagedShell.Interop.NativeMethods;
+
+    public partial class TasksService
+    {
+        /// <summary>
+        /// HeMiDock: windows that became windows of the taskbar without a message of the shell hook are taken in. A Remote
+        /// Desktop window (mstsc) is created hidden or cloaked while it connects and shown later, and windows hidden at the
+        /// start of the dock were left out the same way: they were reachable only by Alt+Tab (the user, 2026-11-24). Known
+        /// windows left out are asked again, unknown ones that qualify now are added. On the thread of the interface.
+        /// </summary>
+        public void Sweep()
+        {
+            if (!IsInitialized) return;
+            lock (_windowsLock)
+            {
+                foreach (var known in Windows.Where(w => !w.ShowInTaskbar).ToList()) known.SetShowInTaskbar();
+                var have = Windows.Select(w => w.Handle).ToHashSet();
+                EnumWindows((hwnd, _) =>
+                {
+                    // cheap checks first: most top-level windows are hidden
+                    if (have.Contains(hwnd) || !IsWindowVisible(hwnd)) return true;
+                    var win = new ApplicationWindow(this, hwnd);
+                    if (win.CanAddToTaskbar && win.ShowInTaskbar)
+                    {
+                        Windows.Add(win);
+                        ManagedShell.Common.Logging.ShellLogger.Debug($"TasksService: Swept in window {hwnd} ({win.LogName})");
+                    }
+                    return true;
+                }, 0);
+            }
+        }
+    }
+}

@@ -3,7 +3,7 @@
 [![Latest release](https://img.shields.io/github/v/release/Hemal1k/HeMiDock?label=release)](https://github.com/Hemal1k/HeMiDock/releases/latest) [![Downloads](https://img.shields.io/github/downloads/Hemal1k/HeMiDock/total)](https://github.com/Hemal1k/HeMiDock/releases) [![License: MIT](https://img.shields.io/github/license/Hemal1k/HeMiDock)](LICENSE) ![Windows 10 / 11](https://img.shields.io/badge/Windows-10%20%2F%2011-0078D4)
 
 A replacement of the Windows taskbar for Windows 10 and 11: a dock with the apps, the notification area, status icons and the
-clock, an own Start menu, a control center, a calendar with the notifications and a window manager. Light
+clock, its own Start menu, a control center, a calendar with the notifications and a window manager. Light
 and dark.
 
 **[Download](https://github.com/Hemal1k/HeMiDock/releases/latest)** · [Project page](https://hemal1k.github.io/hemidock.html) · [Report a problem](https://github.com/Hemal1k/HeMiDock/issues)
@@ -34,6 +34,17 @@ Requirements: Windows 10 2004 or newer / Windows 11, x64 or ARM64.
 - **Calendar** with the notifications of Windows and the events of Outlook or an internet calendar.
 - **Window manager**: zones, always on top, workspaces, rules for apps.
 - **Keyboard shortcuts** for every action; settings with search, export / import and automatic backups.
+- **English and Czech** – follows the language of Windows, or set it in Settings → General. The installer is in English and Czech too.
+
+## Network
+
+HeMiDock connects to the internet only for these:
+
+- **Updates** – the GitHub API (`api.github.com`) for a newer release, when looking for updates is on (or on Check now), and GitHub for the download.
+- **Weather** (off by default) – [Open-Meteo](https://open-meteo.com): the name of the city for the search, then its coordinates for the weather.
+- **Currency conversion** – when you convert a currency in the search: the daily exchange rates of the European Central Bank (`ecb.europa.eu`), at most every 12 hours.
+- **Internet calendar** – only the `.ics` address you enter.
+- **Windows App Runtime** – downloaded from Microsoft when it is missing (asked first).
 
 ## Building
 

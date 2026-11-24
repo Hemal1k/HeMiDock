@@ -869,7 +869,7 @@ sealed partial class SettingsWindow : Window
     {
         var menu = new MenuFlyout { Placement = Microsoft.UI.Xaml.Controls.Primitives.FlyoutPlacementMode.TopEdgeAlignedLeft };
         void Add(string text, Action click) { var i = new MenuFlyoutItem { Text = L.T(text) }; i.Click += (_, _) => click(); menu.Items.Add(i); }
-        Add("Open config folder", () => { Directory.CreateDirectory(AppPaths.Folder); Fg.Run("explorer.exe", $"\"{AppPaths.Folder}\""); });
+        Add("Open settings folder", () => { Directory.CreateDirectory(AppPaths.Folder); Fg.Run("explorer.exe", $"\"{AppPaths.Folder}\""); });
         menu.Items.Add(new MenuFlyoutSeparator());
         Add("Export…", async () =>
         {
@@ -888,7 +888,20 @@ sealed partial class SettingsWindow : Window
             var picker = new Windows.Storage.Pickers.FileOpenPicker();
             picker.FileTypeFilter.Add(".json");
             WinRT.Interop.InitializeWithWindow.Initialize(picker, WinRT.Interop.WindowNative.GetWindowHandle(this));
-            if (await picker.PickSingleFileAsync() is { } file && !DockSettings.Current.Import(file.Path, pins: DockSettings.HasPins(file.Path)))
+            if (await picker.PickSingleFileAsync() is not { } file) return;
+            // pinned apps in the file: they start programs, so the user sees which ones before they are taken over
+            bool pins = false;
+            if (DockSettings.HasPins(file.Path))
+            {
+                string list = DockSettings.DescribePins(file.Path);
+                var answer = await Dialogs.Choose(this, L.T("Import settings"),
+                    L.T("The file also contains pinned apps. They replace your current pins of the dock and Start and will start these programs and paths:")
+                    + "\n\n" + (list.Length > 0 ? list : "–"),
+                    L.T("Import with pinned apps"), L.T("Settings only"));
+                if (answer == ContentDialogResult.None) return;
+                pins = answer == ContentDialogResult.Primary;
+            }
+            if (!DockSettings.Current.Import(file.Path, pins))
                 await Dialogs.Info(this, L.T("Import settings"), L.T("This file does not contain HeMiDock settings."));
         });
         return menu;
@@ -904,13 +917,29 @@ static class Dialogs
         await new ContentDialog { Title = title, Content = text, CloseButtonText = L.T("OK"), XamlRoot = root }.ShowAsync();
     }
 
-    /// <summary>A question with Yes / Cancel; true for Yes.</summary>
-    public static async Task<bool> Confirm(Window owner, string title, string text)
+    /// <summary>A question with Yes / Cancel; true for Yes (its button says "Remove" unless <paramref name="yes"/> says otherwise).</summary>
+    public static async Task<bool> Confirm(Window owner, string title, string text, string yes = null)
     {
         if (owner.Content?.XamlRoot is not { } root) return false;
         return await new ContentDialog
         {
-            Title = title, Content = text, PrimaryButtonText = L.T("Remove"), CloseButtonText = L.T("Cancel"), DefaultButton = ContentDialogButton.Close, XamlRoot = root
+            Title = title, Content = text, PrimaryButtonText = yes ?? L.T("Remove"), CloseButtonText = L.T("Cancel"), DefaultButton = ContentDialogButton.Close, XamlRoot = root
         }.ShowAsync() == ContentDialogResult.Primary;
+    }
+
+    /// <summary>A question with two answers and Cancel (a long text scrolls); Primary, Secondary or None for Cancel.</summary>
+    public static async Task<ContentDialogResult> Choose(Window owner, string title, string text, string first, string second)
+    {
+        if (owner.Content?.XamlRoot is not { } root) return ContentDialogResult.None;
+        var content = new ScrollViewer
+        {
+            MaxHeight = 360,
+            Content = new TextBlock { Text = text, TextWrapping = TextWrapping.Wrap, IsTextSelectionEnabled = true }
+        };
+        return await new ContentDialog
+        {
+            Title = title, Content = content, PrimaryButtonText = first, SecondaryButtonText = second, CloseButtonText = L.T("Cancel"),
+            DefaultButton = ContentDialogButton.Close, XamlRoot = root
+        }.ShowAsync();
     }
 }
