@@ -502,7 +502,7 @@ sealed class TopBarWindow : Window, IPanelWindow
     /// <summary>A double click on an empty place of the bar maximizes the active window or restores it (like its title bar).</summary>
     void Root_DoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
     {
-        if (e.OriginalSource != _root && e.OriginalSource is not StackPanel) return;
+        if (!ReferenceEquals(e.OriginalSource, _root) && e.OriginalSource is not StackPanel) return;
         var w = _appWindow;
         if (w == IntPtr.Zero || !Native.IsWindowVisible(w) || _appName.Text == L.T("Desktop")) return;
         e.Handled = true;
@@ -511,7 +511,7 @@ sealed class TopBarWindow : Window, IPanelWindow
 
     void Root_RightTapped(object sender, RightTappedRoutedEventArgs e)
     {
-        if (e.Handled || e.OriginalSource != _root && e.OriginalSource is not StackPanel) return;
+        if (e.Handled || !ReferenceEquals(e.OriginalSource, _root) && e.OriginalSource is not StackPanel) return;
         e.Handled = true;
         var menu = NewMenu();
         if (S.DockEditMode)

@@ -44,6 +44,7 @@ HeMiDock connects to the internet only for these:
 - **Weather** (off by default) – [Open-Meteo](https://open-meteo.com): the name of the city for the search, then its coordinates for the weather.
 - **Currency conversion** – when you convert a currency in the search: the daily exchange rates of the European Central Bank (`ecb.europa.eu`), at most every 12 hours.
 - **Internet calendar** – only the `.ics` address you enter.
+- **Web pages pinned to the dock** – when you drop a web address on the dock: that page and its icon (`favicon.ico`), for the icon of the pin.
 - **Windows App Runtime** – downloaded from Microsoft when it is missing (asked first).
 
 ## Building

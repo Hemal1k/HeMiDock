@@ -69,10 +69,12 @@ static class Watchdog
     {
         string file = AppPaths.Of("crash-times.json");
         var times = new List<DateTime>();
-        try { times = JsonSerializer.Deserialize<List<DateTime>>(File.ReadAllText(file)) ?? times; } catch { }
+        try { if (File.Exists(file)) times = JsonSerializer.Deserialize<List<DateTime>>(File.ReadAllText(file)) ?? times; }
+        catch (Exception ex) { Log.Write("Crash times", ex); }
         times.RemoveAll(t => DateTime.UtcNow - t > TimeSpan.FromMinutes(5));
         times.Add(DateTime.UtcNow);
-        try { Directory.CreateDirectory(AppPaths.Folder); File.WriteAllText(file, JsonSerializer.Serialize(times)); } catch { }
+        try { Directory.CreateDirectory(AppPaths.Folder); File.WriteAllText(file, JsonSerializer.Serialize(times)); }
+        catch (Exception ex) { Log.Write("Crash times", ex); }
         return times.Count;
     }
 }

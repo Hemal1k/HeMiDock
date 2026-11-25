@@ -422,17 +422,55 @@ static class WifiFallback
             {
                 string auth = n.SecuritySettings.NetworkAuthenticationType.ToString().Contains("Wpa3", StringComparison.OrdinalIgnoreCase) ? "WPA3SAE" : "WPA2PSK";
                 string xml = $"<?xml version=\"1.0\"?><WLANProfile xmlns=\"http://www.microsoft.com/networking/WLAN/profile/v1\"><name>{ssid}</name><SSIDConfig><SSID><name>{ssid}</name></SSID></SSIDConfig><connectionType>ESS</connectionType><connectionMode>{(automatic ? "auto" : "manual")}</connectionMode><MSM><security><authEncryption><authentication>{auth}</authentication><encryption>AES</encryption><useOneX>false</useOneX></authEncryption><sharedKey><keyType>passPhrase</keyType><protected>false</protected><keyMaterial>{System.Security.SecurityElement.Escape(key)}</keyMaterial></sharedKey></security></MSM></WLANProfile>";
-                file = System.IO.Path.GetTempFileName();
+                // in a new folder of its own, only as long as netsh reads it (Windows keeps the profile encrypted itself)
+                file = System.IO.Path.Combine(Directory.CreateTempSubdirectory(TempPrefix).FullName, "profile.xml");
                 File.WriteAllText(file, xml);
                 Netsh($"wlan add profile filename=\"{file}\" user=current");
+                Wipe(file);
+                file = null;
             }
             if (Netsh($"wlan connect name=\"{n.Ssid}\" ssid=\"{n.Ssid}\"") != 0) return false;
             await Task.Delay(4000);
             return true;
         }
         catch (Exception ex) { Log.Write("Wi-Fi netsh", ex); return false; }
-        finally { if (file != null) try { File.Delete(file); } catch { } }   // the key is in it
+        finally { if (file != null) Wipe(file); }   // the key is in it
     });
+
+    const string TempPrefix = "HeMiDock-wifi-";
+    static bool _leftoversWiped;
+
+    /// <summary>The profile with the key: overwritten with zeros and deleted with its folder.</summary>
+    static void Wipe(string file)
+    {
+        try
+        {
+            if (File.Exists(file))
+            {
+                using (var s = new FileStream(file, FileMode.Open, FileAccess.Write, FileShare.None))
+                {
+                    s.Write(new byte[s.Length]);
+                    s.Flush(true);
+                }
+                File.Delete(file);
+            }
+            Directory.Delete(System.IO.Path.GetDirectoryName(file), false);
+        }
+        catch (Exception ex) { Log.Write("Wi-Fi profile file", ex); }
+    }
+
+    /// <summary>A profile file left by an end of the dock between writing and deleting it (a crash, the PC switched off).</summary>
+    public static void WipeLeftovers()
+    {
+        if (_leftoversWiped) return;                                     // once, at the start (before any connect)
+        _leftoversWiped = true;
+        try
+        {
+            foreach (var dir in Directory.EnumerateDirectories(System.IO.Path.GetTempPath(), TempPrefix + "*"))
+                Wipe(System.IO.Path.Combine(dir, "profile.xml"));
+        }
+        catch (Exception ex) { Log.Write("Wi-Fi profile files", ex); }
+    }
 
     static int Netsh(string args)
     {

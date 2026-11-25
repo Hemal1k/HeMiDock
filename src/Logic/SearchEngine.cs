@@ -20,7 +20,8 @@ static class SearchUsage
         get
         {
             if (_counts != null) return _counts;
-            try { _counts = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, int>>(File.ReadAllText(FilePath)); } catch { }
+            try { if (File.Exists(FilePath)) _counts = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, int>>(File.ReadAllText(FilePath)); }
+            catch (Exception ex) { Log.Write("App usage", ex); }
             return _counts ??= new();
         }
     }
@@ -362,8 +363,9 @@ static class SearchEngine
     static List<StartEntry> Files(string q, CancellationToken ct)
     {
         var list = new List<StartEntry>();
-        string safe = q.Replace("'", "''").Replace("%", "").Replace("[", "").Replace("]", "").Replace("_", "");
-        if (safe.Length < 2) return list;
+        // ' doubled (a text of SQL); the wildcards of LIKE in brackets: they are searched for as they are ("my_file", "[draft]")
+        if (q.Length < 2) return list;
+        string safe = q.Replace("'", "''").Replace("[", "[[]").Replace("%", "[%]").Replace("_", "[_]");
 
         try
         {

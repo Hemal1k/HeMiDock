@@ -132,7 +132,7 @@ static class SystemPower
                     foreach (var (managerIid, slot) in UxUpdateManagers)
                     {
                         var want = managerIid;
-                        if (Marshal.QueryInterface(manager, ref want, out IntPtr ux) != 0) continue;
+                        if (Marshal.QueryInterface(manager, in want, out IntPtr ux) != 0) continue;
                         try { return Method<SetAndModifyShutdownFlagsFn>(ux, slot)(ux, flags, out uint changed) == 0 ? changed : flags; }
                         finally { Marshal.Release(ux); }
                     }

@@ -288,6 +288,8 @@ static class L
         ["Solid panels without shadows, frosted glass and animations"] = "Plné panely bez stínů, matného skla a animací",
         ["Apps"] = "Aplikace",
         ["Unit and currency conversion"] = "Převod jednotek a měn",
+        ["Exchange rates from the European Central Bank"] = "Kurzy měn z Evropské centrální banky",
+        ["Also turns off the delay of Windows for the apps started at sign-in"] = "Vypne také zpoždění, se kterým Windows spouští aplikace po přihlášení",
         ["App settings"] = "Nastavení aplikace",
         ["Automatic, dock mode"] = "Automaticky, režim doku",
         ["Size of the dock with its icons"] = "Velikost doku i s ikonami",

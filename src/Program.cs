@@ -136,7 +136,7 @@ static class Program
         }
         finally
         {
-            try { Directory.Delete(dir, true); } catch { }
+            try { Directory.Delete(dir, true); } catch (Exception ex) { Log.Write("Runtime installer folder", ex); }
         }
     }
 #endif

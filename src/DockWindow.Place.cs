@@ -50,7 +50,7 @@ sealed partial class DockWindow
         int body = (int)Math.Ceiling((Vertical ? Row.DesiredSize.Width + pad.Left + pad.Right : Math.Max(Row.DesiredSize.Height, RowRight.DesiredSize.Height) + pad.Top + pad.Bottom) * s + 3 * s);
         int length = (int)Math.Ceiling((Vertical ? Row.DesiredSize.Height + pad.Top + pad.Bottom : Row.DesiredSize.Width + pad.Left + pad.Right) * s + 3 * s);
         int gap = full ? 0 : (int)Math.Round(S.BottomMargin * s);
-        int extra = _expanded ? (int)Math.Ceiling(Math.Max(Overflow, _bouncing > 0 ? IconPx * 0.4 : 0) * s) : 0;
+        int extra = _expanded ? (int)Math.Ceiling(Overflow * s) : 0;
 
         // the part of the monitor the dock lies in: what is left by the other bars
         Native.RECT area;

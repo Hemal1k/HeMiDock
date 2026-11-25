@@ -86,7 +86,7 @@ sealed partial class DockWindow
     void PressPart(FrameworkElement part, PointerRoutedEventArgs e)
     {
         if (!S.DockEditMode || !e.GetCurrentPoint(part).Properties.IsLeftButtonPressed || !Native.GetCursorPos(out var from)) return;
-        if (part == Tray && e.OriginalSource != Tray) return;            // a tray icon: its own drag
+        if (part == Tray && !ReferenceEquals(e.OriginalSource, Tray)) return;            // a tray icon: its own drag
         if (AtInnerEdge(e.GetCurrentPoint(Root).Position)) return;         // the size of the dock is dragged there
         var follow = QueueTimer.Create();
         follow.Interval = TimeSpan.FromMilliseconds(12);
@@ -238,10 +238,10 @@ sealed partial class DockWindow
         Root.AddHandler(UIElement.PointerPressedEvent, new PointerEventHandler((_, e) =>
         {
             if (!S.DockEditMode || !e.GetCurrentPoint(Root).Properties.IsLeftButtonPressed) return;
-            if (e.OriginalSource == _grip || e.OriginalSource == _gripStart || e.OriginalSource == _gripEnd) return;   // the grips themselves
+            if (ReferenceEquals(e.OriginalSource, _grip) || ReferenceEquals(e.OriginalSource, _gripStart) || ReferenceEquals(e.OriginalSource, _gripEnd)) return;   // the grips themselves
             var at = e.GetCurrentPoint(Root).Position;
             if (AtInnerEdge(at)) { (e.OriginalSource as UIElement)?.ReleasePointerCaptures(); e.Handled = true; StartResize(); return; }
-            if (e.OriginalSource != Root && e.OriginalSource != Row && e.OriginalSource != RowRight) return;
+            if (!ReferenceEquals(e.OriginalSource, Root) && !ReferenceEquals(e.OriginalSource, Row) && !ReferenceEquals(e.OriginalSource, RowRight)) return;
             _edgeDragFrom = at;
             Root.CapturePointer(e.Pointer);
             e.Handled = true;

@@ -216,7 +216,7 @@ sealed partial class StartWindow
     void RefreshOpenGroup(string id)
     {
         if (_layout == 1) return;                                        // two columns: the list of pins is built again anyway
-        bool open = FullScreen ? _folderLayer?.Visibility == Visibility.Visible : _main != null && _main.Content != _home;
+        bool open = FullScreen ? _folderLayer?.Visibility == Visibility.Visible : _main != null && !ReferenceEquals(_main.Content, _home);
         if (!open) return;
         Ui.Post(() =>
         {

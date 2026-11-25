@@ -62,7 +62,7 @@ sealed partial class SettingsWindow
         guide.Click += (_, _) => SetupWindow.Open();
         Card(general, "Setup guide", null, guide);                     // the looks are chosen there (the row of looks here was taken away)
         ChoiceRow(general, "Language", null, nameof(DockSettings.Language), "Automatic", "English", "Čeština");
-        ToggleRow(general, "Start at sign-in", null, nameof(DockSettings.StartAtSignIn));
+        ToggleRow(general, "Start at sign-in", "Also turns off the delay of Windows for the apps started at sign-in", nameof(DockSettings.StartAtSignIn));
         ToggleRow(general, "Turn off the highlight of windows and the dock", null, nameof(DockSettings.NoOutline));
         ToggleRow(general, "Advanced editing", "Move the parts of the dock and the top bar with the mouse and change their size, rename apps in Start and change their icons",
             nameof(DockSettings.DockEditMode));
@@ -190,7 +190,7 @@ sealed partial class SettingsWindow
         var search = NewPage("Search options", "\uE721", "search");
         Header(search, "Search results");
         ToggleRow(search, "Apps", null, nameof(DockSettings.SearchApps));
-        ToggleRow(search, "Unit and currency conversion", null, nameof(DockSettings.SearchConversions));
+        ToggleRow(search, "Unit and currency conversion", "Exchange rates from the European Central Bank", nameof(DockSettings.SearchConversions));
         ToggleRow(search, "Windows settings and tools", null, nameof(DockSettings.SearchWindowsSettings));
         ToggleRow(search, "App settings", null, nameof(DockSettings.SearchDockSettings));
         ToggleRow(search, "Files and folders", "From the Windows search index", nameof(DockSettings.SearchFiles));

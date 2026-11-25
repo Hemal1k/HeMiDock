@@ -125,7 +125,7 @@ static class WebPins
                 if (href.Success && !href.Groups[1].Value.EndsWith(".svg", StringComparison.OrdinalIgnoreCase) && Uri.TryCreate(page, System.Net.WebUtility.HtmlDecode(href.Groups[1].Value), out var u)) tries.Add(u);
             }
         }
-        catch { }
+        catch (Exception ex) { Log.Write("Web pin page", ex); }        // the page did not come: /favicon.ico still
         tries.Add(new Uri(page, "/favicon.ico"));
         foreach (var u in tries)
         {
@@ -139,7 +139,7 @@ static class WebPins
                 File.WriteAllBytes(file, bytes);
                 return file;
             }
-            catch { }
+            catch (Exception ex) { Log.Write("Web pin icon", ex); }  // the next one is tried
         }
         return null;
     }

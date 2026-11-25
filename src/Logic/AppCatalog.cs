@@ -452,7 +452,7 @@ static class StartPins
     {
         if (Own.TryGetValue(key, out var look) && look.IconPath is { } old && old != newPath
             && old.StartsWith(AppPaths.Of("Icons"), StringComparison.OrdinalIgnoreCase))
-            try { File.Delete(old); } catch { }
+            try { File.Delete(old); } catch (Exception ex) { Log.Write("Old pin picture", ex); }
     }
 
     static void ChangedOwn(string key, OwnLook look)

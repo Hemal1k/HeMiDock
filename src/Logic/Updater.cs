@@ -81,6 +81,7 @@ static class Updater
     {
         if (_daily != null) return;
         TakeSetupChoice();
+        _ = Task.Run(DeleteOldDownloads);
         var queue = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
         var first = queue.CreateTimer();
         first.Interval = TimeSpan.FromSeconds(30);
@@ -143,9 +144,9 @@ static class Updater
             if (root.TryGetProperty("assets", out var assets))
                 foreach (var a in assets.EnumerateArray())
                     if (string.Equals(a.GetProperty("name").GetString(), SetupAsset, StringComparison.OrdinalIgnoreCase))
-                        setup = a.GetProperty("browser_download_url").GetString();
+                        setup = OwnDownload(a.GetProperty("browser_download_url").GetString());
                     else if (string.Equals(a.GetProperty("name").GetString(), "SHA256SUMS.txt", StringComparison.OrdinalIgnoreCase))
-                        sums = a.GetProperty("browser_download_url").GetString();
+                        sums = OwnDownload(a.GetProperty("browser_download_url").GetString());
             var release = new Release(version, root.TryGetProperty("name", out var n) ? n.GetString() : tag, root.GetProperty("html_url").GetString(), setup, sums);
             bool newer = version > Current && !(quiet && DockSettings.Current.SkippedUpdate == version.ToString());
             Ui.Post(() =>
@@ -158,6 +159,27 @@ static class Updater
             return release;
         }
         catch (Exception ex) { Log.Write("Update check", ex); return null; }
+    }
+
+    /// <summary>
+    /// A download of the releases of this project only (https://github.com/Hemal1k/HeMiDock/releases/download/…); anything
+    /// else is null – the update then opens the page of the release instead of downloading.
+    /// </summary>
+    internal static string OwnDownload(string url) =>
+        Uri.TryCreate(url, UriKind.Absolute, out var u) && u.Scheme == Uri.UriSchemeHttps
+        && u.Host.Equals("github.com", StringComparison.OrdinalIgnoreCase) && u.IsDefaultPort
+        && u.AbsolutePath.StartsWith($"/{Repo}/releases/download/", StringComparison.OrdinalIgnoreCase) ? url : null;
+
+    /// <summary>The folders of earlier updates in %TEMP% (the installer cannot delete itself): removed at the next start.</summary>
+    static void DeleteOldDownloads()
+    {
+        try
+        {
+            foreach (var dir in Directory.EnumerateDirectories(Path.GetTempPath(), "HeMiDock-update-*"))
+                try { Directory.Delete(dir, true); }
+                catch (Exception ex) { Log.Write("Old update", ex); }   // the installer still runs from it
+        }
+        catch (Exception ex) { Log.Write("Old updates", ex); }
     }
 
     /// <summary>The found version is not offered again (a newer one is).</summary>
@@ -183,7 +205,8 @@ static class Updater
         {
             Host.ShowInfo?.Invoke(L.T("Downloading HeMiDock {0}…", v));
             SetBusy(L.T("Downloading HeMiDock {0}…", v));
-            string file = Path.Combine(Path.GetTempPath(), $"HeMiDock-Setup-{v}.exe");
+            // a new folder of its own (not a name in %TEMP% known beforehand), deleted at the next start
+            string file = Path.Combine(Directory.CreateTempSubdirectory("HeMiDock-update-").FullName, SetupAsset);
             using (var response = await Http.GetAsync(release.SetupUrl, HttpCompletionOption.ResponseHeadersRead))
             {
                 response.EnsureSuccessStatusCode();
@@ -206,16 +229,20 @@ static class Updater
             string sums = await Http.GetStringAsync(release.SumsUrl);
             string want = sums.Split('\n').Select(l => l.Trim().Split((char[])null, 2, StringSplitOptions.RemoveEmptyEntries))
                 .Where(p => p.Length == 2 && p[1].TrimStart('*').Equals(SetupAsset, StringComparison.OrdinalIgnoreCase)).Select(p => p[0].ToLowerInvariant()).FirstOrDefault();
-            string have;
-            using (var s = File.OpenRead(file)) have = Convert.ToHexString(await System.Security.Cryptography.SHA256.HashDataAsync(s)).ToLowerInvariant();
-            if (want == null || want != have)
+            // held open (others may only read it) from the check until it runs: nothing can change it in between
+            using (var hold = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.Read))
             {
-                File.Delete(file);
-                throw new InvalidDataException($"{SetupAsset}: the checksum does not match");
+                string have = Convert.ToHexString(await System.Security.Cryptography.SHA256.HashDataAsync(hold)).ToLowerInvariant();
+                if (want == null || want != have)
+                {
+                    hold.Dispose();
+                    File.Delete(file);
+                    throw new InvalidDataException($"{SetupAsset}: the checksum does not match");
+                }
+                // quietly, without its window (the user, 2026-11-23); for all users the installer asks for administrator rights
+                // itself (UAC), for the user it runs without them
+                Process.Start(new ProcessStartInfo(file, $"/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /UPDATE {mode}") { UseShellExecute = true });
             }
-            // quietly, without its window (the user, 2026-11-23); for all users the installer asks for administrator rights
-            // itself (UAC), for the user it runs without them
-            Process.Start(new ProcessStartInfo(file, $"/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /UPDATE {mode}") { UseShellExecute = true });
             App.Quit();                                                  // the installer replaces the files and starts the dock again
         }
         catch (Exception ex)
@@ -241,7 +268,10 @@ static class HeMiLauncher
 {
     static string UpdatesFile => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "HeMi", "HeMiLauncher", "updates.txt");
 
-    /// <summary>The exe of the launcher (it writes where it is at each start; null when it is not there any more).</summary>
+    /// <summary>
+    /// The exe of the launcher (it writes where it is at each start; null when it is not there any more, or when the path
+    /// there is not a HeMiLauncher.exe).
+    /// </summary>
     public static string Exe
     {
         get
@@ -249,9 +279,10 @@ static class HeMiLauncher
             try
             {
                 using var k = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\HeMi\HeMiLauncher");
-                return k?.GetValue("Path") is string p && File.Exists(p) ? p : null;
+                return k?.GetValue("Path") is string p && Path.IsPathFullyQualified(p)
+                    && Path.GetFileName(p).Equals("HeMiLauncher.exe", StringComparison.OrdinalIgnoreCase) && File.Exists(p) ? p : null;
             }
-            catch { return null; }
+            catch { return null; }   // no launcher: the dock looks for its updates itself
         }
     }
 

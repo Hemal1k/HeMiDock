@@ -135,8 +135,14 @@ Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Explorer\StartupA
 Root: HKCU; Subkey: "Software\Classes\Local Settings\Software\Microsoft\Windows\Shell\MuiCache"; ValueType: none; ValueName: "{app}\HeMiDock.exe.FriendlyAppName"; Flags: uninsdeletevalue dontcreatekey
 Root: HKCU; Subkey: "Software\Classes\Local Settings\Software\Microsoft\Windows\Shell\MuiCache"; ValueType: none; ValueName: "{app}\HeMiDock.exe.ApplicationCompany"; Flags: uninsdeletevalue dontcreatekey
 Root: HKCU; Subkey: "Software\Classes\Applications\HeMiDock.exe"; Flags: uninsdeletekey dontcreatekey
+; "Pin to Start" of HeMiDock in File Explorer and the block of the one of Windows it stands for – removed also when
+; "HeMiDock.exe --uninstall" cannot run (no .NET any more), so that the item of Windows comes back
+Root: HKCU; Subkey: "Software\Classes\*\shell\HeMiDock.PinToStart"; Flags: uninsdeletekey dontcreatekey
+Root: HKCU; Subkey: "Software\Classes\Directory\shell\HeMiDock.PinToStart"; Flags: uninsdeletekey dontcreatekey
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Shell Extensions\Blocked"; ValueType: none; ValueName: "{{470C0EBD-5D73-4d58-9CED-E91E22E23282}"; Flags: uninsdeletevalue dontcreatekey
 Root: HKCU; Subkey: "Software\HeMi\HeMiDock"; ValueType: none; ValueName: "SetupCheckUpdates"; Flags: uninsdeletevalue dontcreatekey
 Root: HKCU; Subkey: "Software\HeMi\HeMiDock"; ValueType: none; ValueName: "SetupInstallUpdates"; Flags: uninsdeletevalue dontcreatekey
+Root: HKCU; Subkey: "Software\HeMi\HeMiDock"; ValueType: none; ValueName: "PrevStartupDelay"; Flags: uninsdeletevalue dontcreatekey
 Root: HKCU; Subkey: "Software\HeMi\HeMiDock"; Flags: uninsdeletekeyifempty dontcreatekey
 Root: HKCU; Subkey: "Software\HeMi"; Flags: uninsdeletekeyifempty dontcreatekey
 
@@ -185,14 +191,19 @@ end;
 procedure StopOld;
 var
   Code: Integer;
+  Quoted: String;
 begin
   OldFolder := FindOldFolder;
   if OldFolder = '' then Exit;
   // the dock gives the taskbar of Windows back first
   Exec(OldFolder + '\HeMiDock.exe', '--exit', '', SW_HIDE, ewWaitUntilTerminated, Code);
   Sleep(1500);
+  { the folder (from the registry) goes into PowerShell in single quotes, a ' in it doubled; compared as text (StartsWith),
+    not as a pattern of -like ([ ] in a path) }
+  Quoted := OldFolder + '\';
+  StringChangeEx(Quoted, '''', '''''', True);
   Exec(ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'),
-    '-NoProfile -NonInteractive -Command "Get-Process | Where-Object { $_.Path -like ''' + OldFolder + '\*'' } | Stop-Process -Force"',
+    '-NoProfile -NonInteractive -Command "$d = ''' + Quoted + '''; Get-Process | Where-Object { $_.Path -and $_.Path.StartsWith($d, [StringComparison]::OrdinalIgnoreCase) } | Stop-Process -Force"',
     '', SW_HIDE, ewWaitUntilTerminated, Code);
 end;
 

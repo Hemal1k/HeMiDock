@@ -24,7 +24,7 @@
     <AssemblyName>HeMiDock</AssemblyName>
     <Product>HeMiDock</Product>
     <!-- big changes +1, smaller +0.1, really small +0.0.1 -->
-    <Version>1.12.0</Version>
+    <Version>1.12.1</Version>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == ''">win-x64</RuntimeIdentifier>
     <Platforms>x64;ARM64</Platforms>
@@ -46,8 +46,7 @@
     <DefineConstants Condition="'$(Portable)' != 'true'">$(DefineConstants);HEMI_BOOTSTRAP</DefineConstants>
     <ApplicationIcon>Assets\HeMiDock.ico</ApplicationIcon>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <!-- the code of ManagedShell as it is: its own warnings are not ours -->
-    <NoWarn>$(NoWarn);CS0168;CS0169;CS0414;CS0649;CS0618;CS1998;CA1416;SYSLIB1054;CS8981</NoWarn>
+    <!-- the code of ManagedShell as it is: its own warnings are switched off in Shell\ManagedShell\.editorconfig only -->
   </PropertyGroup>
 
   <!-- -p:Portable=true: the release that runs without installing anything – .NET and the Windows App Runtime inside (both

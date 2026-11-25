@@ -189,14 +189,28 @@ static class Autostart
         catch { }                                                       // there was none
     }
 
-    /// <summary>Windows delays the apps of sign-in by some seconds; without the delay the dock replaces the taskbar sooner.</summary>
+    /// <summary>
+    /// Windows delays the apps of sign-in by some seconds; without the delay the dock replaces the taskbar sooner (it is the
+    /// same for all apps of sign-in). The value there before is kept (HKCU\Software\HeMi\HeMiDock\PrevStartupDelay, -1: there
+    /// was none) and put back when the start at sign-in goes off. A 0 found there counts as none: earlier versions of the dock
+    /// wrote it without keeping anything.
+    /// </summary>
     static void NoStartupDelay(bool on)
     {
+        const string Value = "StartupDelayInMSec", Prev = "PrevStartupDelay";
         try
         {
             using var s = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Explorer\Serialize");
-            if (!on) s.DeleteValue("StartupDelayInMSec", false);
-            else if (s.GetValue("StartupDelayInMSec") is not int d || d != 0) s.SetValue("StartupDelayInMSec", 0, Microsoft.Win32.RegistryValueKind.DWord);
+            using var own = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(@"Software\HeMi\HeMiDock");
+            if (on)
+            {
+                if (own.GetValue(Prev) == null) own.SetValue(Prev, s.GetValue(Value) is int was && was != 0 ? was : -1, Microsoft.Win32.RegistryValueKind.DWord);
+                if (s.GetValue(Value) is not int d || d != 0) s.SetValue(Value, 0, Microsoft.Win32.RegistryValueKind.DWord);
+                return;
+            }
+            if (own.GetValue(Prev) is int before && before != -1) s.SetValue(Value, before, Microsoft.Win32.RegistryValueKind.DWord);
+            else s.DeleteValue(Value, false);
+            own.DeleteValue(Prev, false);
         }
         catch (Exception ex) { Log.Write("Autostart delay", ex); }
     }
@@ -880,7 +894,7 @@ public partial class DockSettings : INotifyPropertyChanged
             {
                 if (!values.TryGetValue(p.Name, out var v) || v == null) continue;
                 try { p.SetValue(this, Convert.ChangeType(v, p.PropertyType, System.Globalization.CultureInfo.InvariantCulture)); }
-                catch { }
+                catch (Exception ex) { Log.Write("Setting " + p.Name, ex); }   // a value of another type: the setting keeps its default
             }
         }
         finally { _suspend = false; }

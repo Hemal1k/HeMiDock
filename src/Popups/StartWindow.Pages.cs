@@ -47,7 +47,7 @@ sealed partial class StartWindow
             grid.Children.Add(b);
         }
         var page = new Grid { Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent), Children = { grid } };
-        page.Tapped += (_, e) => { if (e.OriginalSource == page && !_tapEndedNaming) ShowHomePage(); };
+        page.Tapped += (_, e) => { if (ReferenceEquals(e.OriginalSource, page) && !_tapEndedNaming) ShowHomePage(); };
         if (FullScreen) { ShowCard(page, null); return; }
         _main.Content = page;
     }
@@ -99,7 +99,7 @@ sealed partial class StartWindow
             Padding = new Thickness(24), CornerRadius = new CornerRadius(12), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
             Background = new SolidColorBrush(global::Windows.UI.Color.FromArgb(0xE6, 0x2A, 0x2A, 0x30)), BorderBrush = Res("CardStrokeColorDefaultBrush"), BorderThickness = new Thickness(1)
         };
-        card.Tapped += (_, e) => { if (e.OriginalSource != card) return; e.Handled = true; };
+        card.Tapped += (_, e) => { if (!ReferenceEquals(e.OriginalSource, card)) return; e.Handled = true; };
         _folderLayer.Children.Clear();
         _folderLayer.Children.Add(card);
         _folderLayer.Visibility = Visibility.Visible;

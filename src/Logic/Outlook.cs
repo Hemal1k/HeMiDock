@@ -166,7 +166,7 @@ static class OutlookCalendar
                 if (older || ++n >= 300) break;
             }
         }
-        catch { }
+        catch (Exception ex) { Log.Write("Outlook read mail", ex); }
         finally { Release(recent, items, inbox, ns, app); }
         return subjects;
     });

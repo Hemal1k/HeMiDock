@@ -108,7 +108,7 @@ sealed partial class StartWindow : PopupWindow
         if (_naming != null) { EndNaming(null); return true; }           // the name of a group being written: only that is cancelled
         if (_search.Text.Length > 0) { _search.Text = ""; return true; }
         if (_folderLayer?.Visibility == Visibility.Visible) { CloseFolder(); return true; }
-        if (_main != null && _main.Content != _home) { ShowHomePage(); return true; }   // letters, folder, all apps → back
+        if (_main != null && !ReferenceEquals(_main.Content, _home)) { ShowHomePage(); return true; }   // letters, folder, all apps → back
         return false;
     }
 
@@ -383,10 +383,10 @@ sealed partial class StartWindow : PopupWindow
         // the opened folder as a card in the middle; a click beside it closes it
         _folderLayer = new Grid { Visibility = Visibility.Collapsed, Background = new SolidColorBrush(global::Windows.UI.Color.FromArgb(0x60, 0, 0, 0)) };
         Grid.SetRowSpan(_folderLayer, 3);
-        _folderLayer.Tapped += (_, e) => { if (e.OriginalSource == _folderLayer && !_tapEndedNaming) CloseFolder(); e.Handled = true; };
+        _folderLayer.Tapped += (_, e) => { if (ReferenceEquals(e.OriginalSource, _folderLayer) && !_tapEndedNaming) CloseFolder(); e.Handled = true; };
         _root.Children.Add(_folderLayer);
         // a click on empty space closes the whole Start
-        _root.Tapped += (_, e) => { if (e.OriginalSource is Grid or ScrollViewer or StackPanel && e.OriginalSource != _folderLayer && !_tapEndedNaming) CloseNow(); };
+        _root.Tapped += (_, e) => { if (e.OriginalSource is Grid or ScrollViewer or StackPanel && !ReferenceEquals(e.OriginalSource, _folderLayer) && !_tapEndedNaming) CloseNow(); };
         return _root;
     }
 

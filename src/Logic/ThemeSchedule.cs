@@ -74,7 +74,7 @@ static class ThemeSchedule
                 var found = Weather.SearchAsync(city, 1).GetAwaiter().GetResult().FirstOrDefault();
                 if (found != null) _place = (city, found.Lat, found.Lon);
             }
-            catch { }
+            catch (Exception ex) { Log.Write("Theme city", ex); }
         }
         if (_place is { } p && p.City == city) return (p.Lat, p.Lon);
         return (50, TimeZoneInfo.Local.BaseUtcOffset.TotalHours * 15);

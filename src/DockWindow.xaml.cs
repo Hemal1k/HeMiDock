@@ -40,7 +40,7 @@ public sealed partial class DockWindow : Window, IPanelWindow
     List<PinnedApp> _pins = new();
     List<DockEntry> _entries = new();
     string _shown, _trayShown, _layoutShown;
-    int _tick, _menusOpen, _bouncing, _awayMs;
+    int _tick, _menusOpen, _awayMs;
     long _binCount = -2;
     bool _expanded, _autoHidden, _fullScreen, _visible = true, _closed;
     Native.RECT _body;                                                // the dock itself on the screen (without the room for magnified icons)

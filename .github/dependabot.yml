@@ -1,7 +1,12 @@
-# GitHub keeps the actions of the workflows up to date: a pull request when a new version comes out.
+# GitHub keeps the actions of the workflows and the NuGet packages of the app up to date: a pull request when a new version
+# comes out (a new Windows App SDK also needs AppRuntimeMin and the runtime links of the installer checked – tried by hand).
 version: 2
 updates:
   - package-ecosystem: github-actions
     directory: /
+    schedule:
+      interval: monthly
+  - package-ecosystem: nuget
+    directory: /src
     schedule:
       interval: monthly

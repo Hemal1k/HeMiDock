@@ -16,7 +16,7 @@ class PopupWindow : Window
     [DllImport("user32.dll")] static extern uint GetDpiForWindow(IntPtr h);
 
     static readonly Dictionary<string, PopupWindow> Pool = new();
-    public static PopupWindow Current { get; private set; }
+    public static new PopupWindow Current { get; private set; }
 
     protected IntPtr Hwnd { get; }
     readonly string _kind;

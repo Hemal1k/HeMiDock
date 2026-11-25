@@ -166,7 +166,7 @@ sealed partial class ControlCenterWindow : PopupWindow
         CornerRadius = new CornerRadius(8), Padding = new Thickness(padding, 8, padding, 10), Child = child
     };
 
-    static TextBlock Title(string text) => new() { Text = text, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center };
+    static new TextBlock Title(string text) => new() { Text = text, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center };
 
     // ───────────────────────── main page ─────────────────────────
 

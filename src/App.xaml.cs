@@ -354,7 +354,7 @@ public partial class App : Application
         }
         var bar = TopBar;
         TopBar = null;
-        if (Anchor == bar) Anchor = null;
+        if (ReferenceEquals(Anchor, bar)) Anchor = null;
         bar.Close();
     }
 
@@ -385,7 +385,7 @@ public partial class App : Application
         }
         foreach (var d in gone)
         {
-            if (Anchor == d) Anchor = null;
+            if (ReferenceEquals(Anchor, d)) Anchor = null;
             if (Dock == d) Dock = null;
             d.Close();
         }
@@ -435,6 +435,7 @@ public partial class App : Application
         Run("windows", WindowManager.Apply);
         Run("window places", WindowPlaces.Start);                         // windows Windows moved only for the dock go back
         Run("updates", Updater.Start);                                    // new versions on GitHub (once; the switch is asked each time)
+        Run("wi-fi files", WifiFallback.WipeLeftovers);                   // a profile with a Wi-Fi key left in %TEMP% by a crash (once)
         Run("outlook", s.TakeOutlookOnce);                                // the classic Outlook found: its calendar on (once)
         Run("rules", AppRules.Apply);
         Run("weather", Weather.Apply);
@@ -487,7 +488,7 @@ public partial class App : Application
         try { KeyboardHook.Stop(); } catch { }
         try { WindowManager.RefreshMarks(end: true); WindowOutlines.Apply(false); } catch { }
         try { ToastMover.Apply(false); } catch { }
-        try { DockSettings.Current.Save(); } catch { }
+        try { DockSettings.Current.Save(); } catch (Exception ex) { Log.Write("Save at the end", ex); }
         ShellHost.Stop();                                              // the taskbar of Windows comes back, the apps give their icons to Explorer
     }
 

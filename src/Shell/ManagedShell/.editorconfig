@@ -1,0 +1,11 @@
+# The code of ManagedShell as it is: its own warnings are not ours (only for this folder, the rest of the app gets them)
+[*.cs]
+dotnet_diagnostic.CS0168.severity = none
+dotnet_diagnostic.CS0169.severity = none
+dotnet_diagnostic.CS0414.severity = none
+dotnet_diagnostic.CS0649.severity = none
+dotnet_diagnostic.CS0618.severity = none
+dotnet_diagnostic.CS1998.severity = none
+dotnet_diagnostic.CA1416.severity = none
+dotnet_diagnostic.SYSLIB1054.severity = none
+dotnet_diagnostic.CS8981.severity = none
