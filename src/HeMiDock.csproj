@@ -144,7 +144,7 @@
     <!-- sign-out and display changes (it came with WPF before; on its own it needs nothing of it) -->
     <PackageReference Include="Microsoft.Win32.SystemEvents" Version="9.0.10" />
     <!-- volume control (Core Audio) -->
-    <PackageReference Include="NAudio.Wasapi" Version="2.2.1" />
+    <PackageReference Include="NAudio.Wasapi" Version="3.3.0" />
     <!-- display brightness (WMI) -->
     <PackageReference Include="System.Management" Version="9.0.10" />
     <!-- file search in the Windows Search index -->
