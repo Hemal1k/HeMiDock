@@ -300,13 +300,22 @@ static class BarMedia
 
     static void Use(Windows.Media.Control.GlobalSystemMediaTransportControlsSession session)
     {
-        if (_session != null) { _session.MediaPropertiesChanged -= MediaChanged; _session.PlaybackInfoChanged -= MediaChanged; }
+        if (_session != null) { _session.MediaPropertiesChanged -= PropertiesChanged; _session.PlaybackInfoChanged -= MediaChanged; }
         _session = session;
-        if (_session != null) { _session.MediaPropertiesChanged += MediaChanged; _session.PlaybackInfoChanged += MediaChanged; }
+        if (_session != null) { _session.MediaPropertiesChanged += PropertiesChanged; _session.PlaybackInfoChanged += MediaChanged; }
+        _pictureStale = true;
         Refresh();
     }
 
     static void MediaChanged(Windows.Media.Control.GlobalSystemMediaTransportControlsSession s, object e) => OnUi(Refresh);
+
+    /// <summary>
+    /// New properties: the picture is read again even with the same title – a browser first gives its own icon and the
+    /// frame of the video (or the cover) a moment later under the same title, which stayed hidden behind the icon.
+    /// </summary>
+    static void PropertiesChanged(Windows.Media.Control.GlobalSystemMediaTransportControlsSession s, object e) => OnUi(() => { _pictureStale = true; Refresh(); });
+
+    static bool _pictureStale = true;
 
     static async void Refresh()
     {
@@ -321,7 +330,9 @@ static class BarMedia
                 bool playing = session.GetPlaybackInfo()?.PlaybackStatus == Windows.Media.Control.GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing;
                 now = (string.IsNullOrWhiteSpace(artist) ? props.Title : $"{artist} – {props.Title}", playing);
                 // the same picture again (only play / pause changed): not read once more
-                byte[] picture = Details is { } old && old.Title == props.Title && old.Artist == artist && old.Picture != null ? old.Picture : await PictureOf(props);
+                bool stale = _pictureStale;
+                _pictureStale = false;
+                byte[] picture = !stale && Details is { } old && old.Title == props.Title && old.Artist == artist && old.Picture != null ? old.Picture : await PictureOf(props);
                 var (app, key) = AppOf(session.SourceAppUserModelId);
                 details = new Media(props.Title, artist, picture, app, key, playing);
             }

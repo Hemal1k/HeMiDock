@@ -697,8 +697,13 @@ public partial class DockSettings : INotifyPropertyChanged
     /// <summary>Orange location pin while an app uses the location (new: off by default).</summary>
     public bool ShowLocationUse { get => _showLocationUse; set => Set(ref _showLocationUse, value); }
     bool _checkUpdates = true;
-    /// <summary>New versions looked for on GitHub after the start and once a day (on: the update is what the user asked for).</summary>
+    /// <summary>New versions looked for on GitHub after the start and then regularly (on: the update is what the user asked for).</summary>
     public bool CheckUpdates { get => _checkUpdates; set => Set(ref _checkUpdates, value); }
+    int _updateInterval = 2;
+    /// <summary>How often the automatic check looks: 0 every hour, 1 every 3 hours, 2 every 6 hours (default), 3 every 12 hours, 4 once a day.</summary>
+    public int UpdateInterval { get => _updateInterval; set => Set(ref _updateInterval, Math.Clamp(value, 0, 4)); }
+    /// <summary>The time between the automatic checks of <see cref="UpdateInterval"/>.</summary>
+    [NotStored] public TimeSpan UpdateEvery => TimeSpan.FromHours(UpdateInterval switch { 0 => 1, 1 => 3, 3 => 12, 4 => 24, _ => 6 });
     bool _installUpdates;
     /// <summary>A new version found by the automatic check is installed at once (installed dock only; off by default).</summary>
     public bool InstallUpdates { get => _installUpdates; set => Set(ref _installUpdates, value); }

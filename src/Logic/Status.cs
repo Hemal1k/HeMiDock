@@ -128,7 +128,6 @@ static class AudioControl
                         device = Devices.GetDefaultAudioEndpoint(_flow, _role);
                         string name = device.FriendlyName;
                         var volume = device.AudioEndpointVolume;
-                        lock (_stateGate) _state = (volume.MasterVolumeLevelScalar, volume.Mute, name);
                         // only the short lock of the state here: Windows waits for this to end when the device is let go
                         volume.OnVolumeNotification += data =>
                         {
@@ -136,8 +135,16 @@ static class AudioControl
                             Changed?.Invoke();
                         };
                         _device = device;
+                        // the level read after the notifications are on: a change between the two is not lost
+                        lock (_stateGate) _state = (volume.MasterVolumeLevelScalar, volume.Mute, name);
                     }
-                    catch { _device = null; lock (_stateGate) _state = null; }
+                    catch
+                    {
+                        _device = null;
+                        lock (_stateGate) _state = null;
+                        // let go in the background like in Forget (it waits for its notifications)
+                        if (device != null) { var failed = device; Task.Run(() => { try { failed.Dispose(); } catch { } }); }
+                    }
                     return _device;
                 }
             }
@@ -161,6 +168,27 @@ static class AudioControl
             }
             if (old != null) Task.Run(() => { try { old.Dispose(); } catch { } });
             Changed?.Invoke();
+            Retake();
+        }
+
+        int _retaking;
+
+        /// <summary>
+        /// The new default taken at once in the background – its level read and its volume notifications on – and told by
+        /// <see cref="Changed"/>: it was taken only at the next reading, and the slider of the microphone kept the level of
+        /// the one before. Never on the thread of the notification of Windows (it must not ask the devices from there), and
+        /// once for the roles Windows tells one after another.
+        /// </summary>
+        void Retake()
+        {
+            if (Interlocked.Exchange(ref _retaking, 1) == 1) return;
+            Task.Run(async () =>
+            {
+                await Task.Delay(150);
+                Interlocked.Exchange(ref _retaking, 0);
+                try { _ = State; } catch { }
+                Changed?.Invoke();
+            });
         }
     }
 

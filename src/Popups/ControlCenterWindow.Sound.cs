@@ -95,9 +95,30 @@ sealed partial class ControlCenterWindow
         return (slider, value);
     }
 
+    /// <summary>The output and the input the sliders were made for.</summary>
+    string _audioDevices;
+
+    static string AudioDevicesNow() => AudioControl.Now()?.Name + "|" + AudioControl.MicName();
+
+    /// <summary>
+    /// Windows told a change of the sound: another output or input became the default – the card is made again for it (its
+    /// name, its level; a slider dragged before kept its old value, it follows no more while it has the focus); otherwise
+    /// only the sliders follow.
+    /// </summary>
+    void AudioChanged()
+    {
+        if (_audioDevices != null && AudioDevicesNow() != _audioDevices)
+        {
+            if (_openPage == null && !_editing) { BuildMain(); return; }
+            if (_openPage == "sound") { ShowSound(); return; }
+        }
+        SyncAudio();
+    }
+
     /// <summary>The volume may change by keys or in another app: the sliders follow (not while one is being dragged).</summary>
     void SyncAudio()
     {
+        _audioDevices = AudioDevicesNow();
         _updating = true;
         try
         {

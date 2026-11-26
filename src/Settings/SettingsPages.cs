@@ -21,6 +21,8 @@ sealed partial class SettingsWindow
     void GeneralUpdates(StackPanel general)
     {
         ToggleRow(general, "Check for updates automatically", null, nameof(DockSettings.CheckUpdates));
+        Depends(ChoiceRow(general, "How often to check", null, nameof(DockSettings.UpdateInterval),
+            "Every hour", "Every 3 hours", "Every 6 hours", "Every 12 hours", "Once a day"), () => DockSettings.Current.CheckUpdates);
         var install = ToggleRow(general, "Install updates automatically", "In the background, without the window of the installer – the dock starts again by itself", nameof(DockSettings.InstallUpdates));
         Depends(install, () => DockSettings.Current.CheckUpdates && Updater.Installed);
         var check = new Button { Content = L.T("Check now") };
@@ -137,7 +139,7 @@ sealed partial class SettingsWindow
                 load.Click += (_, _) => WindowManager.Open(name);
                 var save = new Button { Content = L.T("Save"), Margin = new Thickness(6, 0, 0, 0) };
                 save.Click += (_, _) => WindowManager.Save(name);
-                var pin = new Button { Content = L.T("Pin to dock"), Margin = new Thickness(6, 0, 0, 0) };
+                var pin = new Button { Content = L.T("Pin to taskbar"), Margin = new Thickness(6, 0, 0, 0) };
                 pin.Click += (_, _) => WindowManager.PinToDock(name);
                 var del = new Button { Content = L.T("Remove"), Margin = new Thickness(6, 0, 0, 0) };
                 del.Click += (_, _) => { WindowManager.Delete(name); ListSpaces(); };

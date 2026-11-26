@@ -173,7 +173,7 @@ static class ShellHost
                 ? "shell:AppsFolder\\" + x.Aumid : x.Window.WinFileName, x.Pid)
         {
             AppId = x.Aumid,
-            Overlay = ToImage(x.Window.OverlayIcon),
+            Overlay = OverlayImage(x.Window.OverlayIcon),
             Progress = Steady(x.Window.Handle, (int)x.Window.ProgressState == 0 ? -1 : x.Window.ProgressValue / 100.0),
             Flashing = x.Window.State == ApplicationWindow.WindowState.Flashing,
             Active = x.Window.State == ApplicationWindow.WindowState.Active
@@ -279,6 +279,14 @@ static class ShellHost
     /// <summary>A picture of the shell part (premultiplied BGRA) for the app; null for none.</summary>
     internal static IconImage ToImage(ShellImage source) =>
         source == null || source.Width <= 0 ? null : new IconImage(source.Pixels, source.Width, source.Height);
+
+    /// <summary>The overlay of a window; an empty (fully transparent) one is none – an app may clear its badge with one.</summary>
+    static IconImage OverlayImage(ShellImage source)
+    {
+        if (ToImage(source) is not { } image) return null;
+        for (int i = 3; i < image.Pixels.Length; i += 4) if (image.Pixels[i] != 0) return image;
+        return null;
+    }
 }
 
 /// <summary>

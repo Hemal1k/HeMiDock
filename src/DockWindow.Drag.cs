@@ -275,7 +275,7 @@ sealed partial class DockWindow
         if (e.DataView.Contains(StandardDataFormats.StorageItems) || e.DataView.Contains(StandardDataFormats.WebLink) || e.DataView.Contains(StandardDataFormats.Text))
         {
             e.AcceptedOperation = DataPackageOperation.Link;
-            e.DragUIOverride.Caption = L.T("Pin to dock");
+            e.DragUIOverride.Caption = L.T("Pin to taskbar");
         }
     }
 
@@ -419,7 +419,7 @@ sealed partial class DockWindow
     void Bin_DragOver(object sender, DragEventArgs e)
     {
         e.Handled = true;
-        if (_dragPin != null) { e.AcceptedOperation = DataPackageOperation.Move; e.DragUIOverride.Caption = L.T("Unpin from dock"); return; }
+        if (_dragPin != null) { e.AcceptedOperation = DataPackageOperation.Move; e.DragUIOverride.Caption = L.T("Unpin from taskbar"); return; }
         e.AcceptedOperation = e.DataView.Contains(StandardDataFormats.StorageItems) ? DataPackageOperation.Move : DataPackageOperation.None;
     }
 

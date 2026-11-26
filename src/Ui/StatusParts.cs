@@ -190,6 +190,29 @@ sealed class StatusParts
     readonly Grid _updateIcon = new() { VerticalAlignment = VerticalAlignment.Center, Visibility = Visibility.Collapsed, Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent) };
     readonly bool _topBar;
 
+    /// <summary>
+    /// Do not disturb at the clock: a small moon beside the time (the bar puts it into its clock) instead of the big one
+    /// among the status icons – that one only while the clock is not shown (<see cref="ClockShown"/>).
+    /// </summary>
+    public FontIcon ClockMoon { get; } = new()
+    {
+        Glyph = "", FontSize = 10, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center,
+        Margin = new Thickness(0, 0, 4, 0), Visibility = Visibility.Collapsed
+    };
+
+    /// <summary>Is the clock of the bar shown (then Do not disturb is the moon at it).</summary>
+    public Func<bool> ClockShown { get; set; }
+
+    bool _dndOn;
+
+    /// <summary>The moon of Do not disturb at the clock or among the icons (also when the clock is shown or hidden).</summary>
+    public void ShowDnd()
+    {
+        bool on = S.ShowStatusSigns && _dndOn, atClock = on && ClockShown?.Invoke() == true;
+        _dnd.Visibility = V(on && !atClock);
+        ClockMoon.Visibility = V(atClock);
+    }
+
     static Ellipse BtDot(HorizontalAlignment side) => new()
     {
         Width = 3, Height = 3, HorizontalAlignment = side, VerticalAlignment = VerticalAlignment.Center, Visibility = Visibility.Collapsed,
@@ -208,6 +231,7 @@ sealed class StatusParts
     public StatusParts(Button host = null)
     {
         _privacy.Foreground = _place.Foreground = ThemeBrush.Get("SystemFillColorCautionBrush");
+        ToolTipService.SetToolTip(ClockMoon, L.T("Do not disturb"));
         _netBox = new Grid { VerticalAlignment = VerticalAlignment.Center, Children = { _net, _netCable } };
         _btOff = new Line { X1 = 0, Y1 = 0, X2 = 1, Y2 = 1, Stretch = Stretch.Fill, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, StrokeThickness = 1.4, IsHitTestVisible = false, Stroke = ThemeBrush.Get("TextFillColorPrimaryBrush") };
         _btIcon.Children.Add(_bt);
@@ -440,7 +464,8 @@ sealed class StatusParts
         var (mic, cam) = (d.Mic, d.Cam);
         _privacy.Visibility = V(mic.Count + cam.Count > 0);
         _privacy.Glyph = mic.Count > 0 ? "" : "";
-        _dnd.Visibility = V(S.ShowStatusSigns && d.Dnd);
+        _dndOn = d.Dnd;
+        ShowDnd();
         _vpn.Visibility = V(S.ShowStatusSigns && d.Vpn != null);
         _micMute.Visibility = V(S.ShowStatusSigns && d.MicMuted);
         // Wi-Fi and a cable at once: the cable (it carries the traffic) big, the Wi-Fi small at its lower right corner (the

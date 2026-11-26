@@ -316,8 +316,8 @@ sealed partial class StartWindow
             }
             else Add(L.T("Pin to Start"), () => StartPins.Add(en.Key));
             if (StartPins.GroupOf(en.Key) != null) Add(L.T("Remove from group"), () => StartPins.RemoveFromGroup(en.Key));
-            if (App.Dock?.IsPinned(en.PinKey) == true) Add(L.T("Unpin from dock"), () => App.Dock?.Unpin(en.PinKey));
-            else Add(L.T("Pin to dock"), () => App.Dock?.Pin(en.PinKey));
+            if (App.Dock?.IsPinned(en.PinKey) == true) Add(L.T("Unpin from taskbar"), () => App.Dock?.Unpin(en.PinKey));
+            else Add(L.T("Pin to taskbar"), () => App.Dock?.Pin(en.PinKey));
         }
         // files and folders can be pinned too
         if (!en.IsApp && en.Key != null && (Directory.Exists(en.Key) || File.Exists(en.Key)))

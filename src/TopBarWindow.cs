@@ -137,7 +137,10 @@ sealed class TopBarWindow : Window, IPanelWindow
         _date.Foreground = ThemeBrush.Get("TextFillColorSecondaryBrush");
         _date.Margin = new Thickness(10, 0, 0, 0);
         _clock = BarButton(null, null);
-        _clock.Content = new StackPanel { Orientation = Orientation.Horizontal, Children = { _time, _date, _badge } };   // one line like on macOS
+        // one line like on macOS; Do not disturb as a small moon before the time
+        _clock.Content = new StackPanel { Orientation = Orientation.Horizontal, Children = { _status.ClockMoon, _time, _date, _badge } };
+        _status.ClockMoon.Margin = new Thickness(0, 0, 5, 0);
+        _status.ClockShown = () => _clock.Visibility == Visibility.Visible;
         _clock.Padding = new Thickness(8, 0, 8, 0);
         _clock.Click += (_, _) => ToggleCalendar();
         // show the desktop: the thin strip at the very end, like in the dock (the dock has none while the top bar is on)
@@ -303,6 +306,7 @@ sealed class TopBarWindow : Window, IPanelWindow
         _date.Visibility = V(S.ShowDate);
         _desktop.Visibility = V(S.ShowDesktopButton);
         _time.FontSize = Math.Max(12, S.ClockFontSize + 1.5);
+        _status.ClockMoon.FontSize = Math.Max(9, Math.Round(_time.FontSize * 0.75));
         _date.FontSize = Math.Max(11, S.DateFontSize + 1);
         foreach (var (id, el) in _parts.Where(p => p.Id.StartsWith("w:"))) el.Visibility = V(QuickLayout.OnBar(id[2..]));
         _line.Visibility = V(S.DockOutline || S.LowGraphics);          // a line along the lower edge (with the outline)

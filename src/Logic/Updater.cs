@@ -6,7 +6,7 @@ namespace HeMiDock;
 
 /// <summary>
 /// New versions from the releases of the project on GitHub (its servers are the update server): checked a moment after the
-/// start and then once a day (Settings → About → Check for updates automatically) or by the button there. A newer one shows
+/// start and then regularly, as often as chosen (Settings → About → Check for updates automatically) or by the button there. A newer one shows
 /// a sign among the status icons; an installed dock downloads its installer and installs it (the dock ends and starts again),
 /// a portable one opens the page of the release.
 /// </summary>
@@ -73,7 +73,8 @@ static class Updater
     }
 
     /// <summary>
-    /// On the thread of the interface: the first check 30 s after the start, then every 6 hours (while switched on). With
+    /// On the thread of the interface: the first check 30 s after the start, then as often as chosen in the settings (every
+    /// 6 hours by default, while switched on). With
     /// "Install updates automatically" a new version is installed in the background: quietly (/VERYSILENT, no window of the
     /// installer), the dock starts again by itself.
     /// </summary>
@@ -90,14 +91,30 @@ static class Updater
         first.Tick += (_, _) => { if (DockSettings.Current.CheckUpdates && !HeMiLauncher.Present) _ = CheckAsync(quiet: true); };
         first.Start();
         _daily = queue.CreateTimer();
-        _daily.Interval = TimeSpan.FromHours(6);
+        _daily.Interval = DockSettings.Current.UpdateEvery;
         _daily.Tick += (_, _) => { if (DockSettings.Current.CheckUpdates && !HeMiLauncher.Present) _ = CheckAsync(quiet: true); };
         _daily.Start();
+        // another choice of "How often to check": the timer starts again with the new time (on the thread of the interface)
+        DockSettings.Current.PropertyChanged += (_, _) =>
+        {
+            if (SynchronizationContext.Current == Ui.Context) ApplyInterval();
+            else Ui.Post(ApplyInterval);
+        };
         _launcher = queue.CreateTimer();
         _launcher.Interval = TimeSpan.FromSeconds(30);
         _launcher.Tick += (_, _) => WatchLauncher();
         _launcher.Start();
         WatchLauncher();
+    }
+
+    /// <summary>Restarts the regular check when the time between the checks changed in the settings.</summary>
+    static void ApplyInterval()
+    {
+        var every = DockSettings.Current.UpdateEvery;
+        if (_daily == null || _daily.Interval == every) return;
+        _daily.Stop();
+        _daily.Interval = every;
+        _daily.Start();
     }
 
     /// <summary>

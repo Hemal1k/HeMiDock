@@ -75,7 +75,7 @@ sealed partial class ControlCenterWindow : PopupWindow
         _netChanged = async () => { if (_openPage == "wifi" && _adapter != null) await BuildNetworksAsync(); else if (_openPage == null) BuildMain(); };
         StatusHub.NetworkChanged += _netChanged;
         // the sound at once when Windows tells a change (keys, the dock, another app), not with the next poll
-        Action audio = () => { if (_audioPosted) return; _audioPosted = true; Ui.Post(() => { _audioPosted = false; if (_visibleNow) SyncAudio(); }); };
+        Action audio = () => { if (_audioPosted) return; _audioPosted = true; Ui.Post(() => { _audioPosted = false; if (_visibleNow) AudioChanged(); }); };
         AudioControl.Changed += audio;
         // another song or video (or its picture came): the main page shows it
         string mediaShown = null;

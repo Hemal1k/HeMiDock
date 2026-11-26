@@ -40,7 +40,7 @@ sealed partial class DockWindow
                     if (e.IconPath != null) _launching.Remove(e.IconPath);
                     if (e.Pin?.Path != null) _launching.Remove(e.Pin.Path);
                 }
-        string shown = string.Join("|", _entries.Select(e => e.IsGap ? (e.Pin.Line ? "L" : "S") : $"{e.IconPath}:{e.Pin?.IconPath}:{e.Name}:{e.Windows.Count}:{e.Windows.Any(w => w.Active)}:{e.Windows.Any(w => w.Flashing)}:{e.Windows.Any(w => w.Progress >= 0)}:{e.Windows.Any(w => w.Overlay != null)}:{_launching.Contains(e.ExePath ?? "")}"))
+        string shown = string.Join("|", _entries.Select(e => e.IsGap ? (e.Pin.Line ? "L" : "S") : $"{e.IconPath}:{e.Pin?.IconPath}:{e.Name}:{e.Windows.Count}:{e.Windows.Any(w => w.Active)}:{e.Windows.Any(w => w.Flashing)}:{e.Windows.Any(w => w.Progress >= 0)}:{OverlayKey(e)}:{_launching.Contains(e.ExePath ?? "")}"))
             + $"|{S.ShowRunningIndicator}{S.ShowAppNames}{S.DockEditMode}{UnreadMail.HasMail}{_layoutShown}";
         if (shown != _shown)
         {
@@ -100,6 +100,21 @@ sealed partial class DockWindow
 
     HashSet<string> _iconKeys;
     static string KeyOf(DockEntry e) => e.ExePath ?? e.IconPath ?? e.Name ?? "";
+
+    /// <summary>
+    /// The overlay the icon shows (the one of its first window that has one) by its pixels, 0 for none: the dock is built
+    /// again when it comes, changes (another number) or goes – only "an overlay or none" was compared, and the badge of
+    /// Teams stayed on the icon after the notification was gone.
+    /// </summary>
+    static int OverlayKey(DockEntry e)
+    {
+        if (e.Windows.Select(w => w.Overlay).FirstOrDefault(o => o != null) is not { } overlay) return 0;
+        var hash = new HashCode();
+        hash.Add(overlay.Width);
+        hash.Add(overlay.Height);
+        hash.AddBytes(overlay.Pixels);
+        return hash.ToHashCode() | 1;
+    }
 
     /// <summary>The progress bars of the icons by their key (their values are moved without building the dock again).</summary>
     readonly Dictionary<string, ProgressBar> _progress = new(StringComparer.OrdinalIgnoreCase);
@@ -434,8 +449,8 @@ sealed partial class DockWindow
             }));
             if (entry.Pin.IconPath != null) menu.Items.Add(Item(L.T("Original icon"), () => EditPins(_ => entry.Pin.IconPath = null)));
         }
-        if (entry.Pin != null) menu.Items.Add(Item(L.T("Unpin from dock"), () => EditPins(p => p.Remove(entry.Pin))));
-        else if (entry.ExePath != null) menu.Items.Add(Item(L.T("Pin to dock"), () => Pin(entry.ExePath)));
+        if (entry.Pin != null) menu.Items.Add(Item(L.T("Unpin from taskbar"), () => EditPins(p => p.Remove(entry.Pin))));
+        else if (entry.ExePath != null) menu.Items.Add(Item(L.T("Pin to taskbar"), () => Pin(entry.ExePath)));
         if (entry.IsRunning)
         {
             int n = entry.Windows.Count;

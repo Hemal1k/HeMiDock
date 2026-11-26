@@ -179,6 +179,7 @@ sealed partial class DockWindow
     void UpdateClock()
     {
         ClockButton.Visibility = V(S.ShowClock && (RightSide || !_main && !S.TopBarOn));
+        _status.ShowDnd();                                              // the moon at the clock or, without it, among the icons
         if (ClockButton.Visibility != Visibility.Visible) return;
         var now = DateTime.Now;
         TimeText.Text = ClockText.Time(now);

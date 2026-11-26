@@ -618,11 +618,8 @@ namespace ManagedShell.WindowsTasks
                 return;
             }
 
-            ShellImage icon = IconImageConverter.GetImageFromHIcon(hIcon, false);
-            if (icon != null)
-            {
-                OverlayIcon = icon;
-            }
+            // HeMiDock: an icon that cannot be read clears the overlay (the old badge stayed on the icon in the dock)
+            OverlayIcon = IconImageConverter.GetImageFromHIcon(hIcon, false);
         }
 
         public void SetOverlayIconDescription(IntPtr lParam)

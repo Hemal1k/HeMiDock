@@ -80,6 +80,8 @@ public sealed partial class DockWindow : Window, IPanelWindow
     {
         InitializeComponent();
         _status = new StatusParts(StatusButton);                        // the status icons, the same as on the top bar
+        TimeLine.Children.Insert(0, _status.ClockMoon);                 // Do not disturb: a small moon before the time
+        _status.ClockShown = () => ClockButton.Visibility == Visibility.Visible;
         _hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
         _mon = monitor;
         _main = main;
@@ -280,7 +282,11 @@ public sealed partial class DockWindow : Window, IPanelWindow
         // (the room of 3 px Place adds: half before the content; the other margin takes it back so the length stays the same)
         Row.Margin = !hugs ? new Thickness(0) : Vertical ? new Thickness(0, 1.5, 0, -1.5) : new Thickness(1.5, 0, -1.5, 0);
         ClockStack.HorizontalAlignment = Vertical ? HorizontalAlignment.Center : HorizontalAlignment.Right;
-        TimeText.HorizontalAlignment = DateText.HorizontalAlignment = Vertical ? HorizontalAlignment.Center : HorizontalAlignment.Right;
+        TimeText.HorizontalAlignment = DateText.HorizontalAlignment = TimeLine.HorizontalAlignment = Vertical ? HorizontalAlignment.Center : HorizontalAlignment.Right;
+        // at a side edge the moon above the time (beside it the clock got wider than the dock)
+        TimeLine.Orientation = Vertical ? Orientation.Vertical : Orientation.Horizontal;
+        _status.ClockMoon.Margin = Vertical ? new Thickness(0, 0, 0, 1) : new Thickness(0, 0, 4, 0);
+        _status.ClockMoon.FontSize = Math.Max(8, Math.Round(S.ClockFontSize * 0.75));
         TimeText.FontSize = S.ClockFontSize;
         DateText.FontSize = S.DateFontSize;
         UsbGlyph.FontSize = S.StatusIconSize;                           // the status icons size themselves (StatusParts)
