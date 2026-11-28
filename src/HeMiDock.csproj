@@ -140,7 +140,7 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.6.4" />
-    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.28000.2705" />
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.28000.2957" />
     <!-- sign-out and display changes (it came with WPF before; on its own it needs nothing of it) -->
     <PackageReference Include="Microsoft.Win32.SystemEvents" Version="9.0.10" />
     <!-- volume control (Core Audio) -->
