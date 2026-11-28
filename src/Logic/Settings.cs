@@ -681,7 +681,7 @@ public partial class DockSettings : INotifyPropertyChanged
     }
     /// <summary>The notifications are moved now (bottom right is where Windows itself shows them).</summary>
     public bool ToastsMoved => ToastPlace != 4;    bool _debugMode;
-    /// <summary>Debug mode: what the app does is written into debug-log.txt (see <see cref="Diag"/>; off by default).</summary>
+    /// <summary>Debug mode: what the app does is written into Logs\debug-log-<day>.txt (see <see cref="Diag"/>; off by default).</summary>
     public bool DebugMode { get => _debugMode; set => Set(ref _debugMode, value); }
     string _dockOrder = "";
     /// <summary>Order of the parts of the dock, moved with the mouse in edit mode (ids of <see cref="MainWindow"/>; empty = default).</summary>

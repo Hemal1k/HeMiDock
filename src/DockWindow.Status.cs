@@ -201,6 +201,12 @@ sealed partial class DockWindow
     }
 
     /// <summary>The clock on this monitor for the notifications "at the clock".</summary>
-    internal (Native.RECT Anchor, double GapDip, int Edge)? ClockAnchor(MonInfo mon) =>
-        ClockButton.Visibility == Visibility.Visible && _visible ? (AnchorRect(ClockButton), 10 + Overflow * 0.3, Edge) : null;
+    /// Null also when the clock is not in the drawn tree right now (the dock being rebuilt or moved to another monitor):
+    /// TransformToVisual then fails with E_UNEXPECTED (log.txt had it about once a day) – the notification goes to the corner.
+    internal (Native.RECT Anchor, double GapDip, int Edge)? ClockAnchor(MonInfo mon)
+    {
+        if (ClockButton.Visibility != Visibility.Visible || !_visible || !ClockButton.IsLoaded || ClockButton.XamlRoot == null) return null;
+        try { return (AnchorRect(ClockButton), 10 + Overflow * 0.3, Edge); }
+        catch (COMException ex) { Diag.Write("ToastMover", "the clock is not drawn right now: " + ex.Message); return null; }
+    }
 }

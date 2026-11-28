@@ -67,7 +67,21 @@ static class Ui
     public static void Post(Action action)
     {
         if (Context == null) action();
-        else Context.Post(_ => action(), null);
+        else Context.Post(_ => Run(action.Method, action), null);
+    }
+
+    /// <summary>
+    /// What the thread of the interface runs right now (the method of the posted work or of the timer tick), null when it is
+    /// not in one – the freeze watch writes it, so a frozen dock in the debug log says what it was doing.
+    /// </summary>
+    public static volatile string Doing;
+
+    internal static void Run(System.Reflection.MethodInfo method, Action action)
+    {
+        var was = Doing;
+        Doing = $"{method?.DeclaringType?.Name}.{method?.Name}";
+        try { action(); }
+        finally { Doing = was; }
     }
 }
 
@@ -91,7 +105,11 @@ sealed class DispatcherTimer
     public void Start()
     {
         Stop();
-        _timer = new Timer(_ => Ui.Post(() => { if (_timer != null) Tick?.Invoke(this, EventArgs.Empty); }), null, Interval, Interval);
+        // the tick named by its handler (not by this lambda) for the freeze watch
+        _timer = new Timer(_ => Ui.Post(() =>
+        {
+            if (_timer != null && Tick is { } tick) Ui.Run(tick.Method, () => tick(this, EventArgs.Empty));
+        }), null, Interval, Interval);
     }
 
     public void Stop()

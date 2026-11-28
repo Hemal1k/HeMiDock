@@ -2,40 +2,36 @@
 
 namespace HeMiDock;
 
-/// <summary>Simple error log in %AppData%\HeMi\HeMiDock\Logs\log.txt (errors only, to find out why something does not work).</summary>
+/// <summary>
+/// Simple error log in %AppData%\HeMi\HeMiDock\Logs\log-&lt;day&gt;.txt (errors only, to find out why something does not
+/// work; one file a day, see <see cref="DailyLog"/>).
+/// </summary>
 static class Log
 {
     static readonly object Gate = new();
+    static readonly DailyLog Daily = new("log", 5 * 1024 * 1024);
 
-    /// <summary>A line into log.txt whatever the debug mode (measurements).</summary>
+    /// <summary>
+    /// A line into the log: in debug mode, with --measure and in a Debug build (--cycle). Otherwise nothing – without debug
+    /// mode the app writes no logs at all.
+    /// </summary>
     public static void Note(string where, string text)
     {
-        try
-        {
-            lock (Gate)
-            {
-                var file = Path.Combine(AppPaths.Logs, "log.txt");
-                Directory.CreateDirectory(Path.GetDirectoryName(file));
-                File.AppendAllText(file, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} [{where}] {text}\n");
-            }
-        }
+#if !DEBUG
+        if (!Diag.On && !Diag.Measuring) return;
+#endif
+        try { lock (Gate) Daily.Append($"{DateTime.Now:yyyy-MM-dd HH:mm:ss} [{where}] {text}\n"); }
         catch { }
     }
 
-    /// <summary>An error into log.txt – only in debug mode (Settings → About), otherwise the app writes no logs at all.</summary>
+    /// <summary>
+    /// An error into the log – only in debug mode (Settings → About), otherwise the app writes no logs at all. With the
+    /// version (a log sent from another PC says which build it is) and the thread.
+    /// </summary>
     public static void Write(string where, Exception ex)
     {
         if (!Diag.On) return;
-        try
-        {
-            lock (Gate)
-            {
-                var file = Path.Combine(AppPaths.Logs, "log.txt");
-                Directory.CreateDirectory(Path.GetDirectoryName(file));
-                if (File.Exists(file) && new FileInfo(file).Length > 256 * 1024) File.Delete(file);
-                File.AppendAllText(file, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} [{where}] {ex}\n");
-            }
-        }
+        try { lock (Gate) Daily.Append($"{DateTime.Now:yyyy-MM-dd HH:mm:ss} [{where}] (HeMiDock {AppInfo.Version}, thread {Environment.CurrentManagedThreadId}) {ex}\n"); }
         catch { }
         Diag.Write("ERROR " + where, ex?.ToString());                // in debug mode also among the other events, in order
     }

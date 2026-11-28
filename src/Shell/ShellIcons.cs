@@ -42,7 +42,21 @@ static class ShellIcons
             return (pixels, bmp.bmWidth, bmp.bmHeight);
         }
         catch (FileNotFoundException) { return null; }                 // a pinned or recent item that is gone (deleted, uninstalled): no icon, nothing to log
+        catch (ArgumentException) when (!LooksLikePath(path))
+        {
+            // not a path at all (log.txt had binary data read as text): once per text into the debug log with where it came from
+            bool first;
+            lock (BadPaths) first = BadPaths.Add(path);                 // icons are read on several threads
+            if (first) Diag.Write("Icon", $"not a path: \"{path}\" from {new System.Diagnostics.StackTrace(1, false)}");
+            return null;
+        }
         catch (Exception ex) { Log.Write("Icon " + path, ex); return null; }
         finally { if (hbmp != IntPtr.Zero) DeleteObject(hbmp); }
     }
+
+    static readonly HashSet<string> BadPaths = new();
+
+    /// <summary>A file path (C:\…, \\server\…), a shell folder (::{…}, shell:…) or an address (https://…).</summary>
+    static bool LooksLikePath(string path) =>
+        !string.IsNullOrEmpty(path) && (path.Contains(':') || path.StartsWith("\\\\"));
 }

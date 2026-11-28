@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.IO.Compression;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -7,20 +7,80 @@ using Microsoft.Win32;
 namespace HeMiDock;
 
 /// <summary>
-/// Debug mode (Settings → About, off by default): what the app does – start, monitors, pop-ups, launched apps, changed
-/// settings, errors – goes with exact times into Logs\debug-log.txt in the settings folder, every few minutes with its memory
+/// A log in one file a day (debug-log-2026-11-28.txt), small enough to open and read whole: a day with more than 1 MB goes
+/// on in debug-log-2026-11-28-2.txt, -3 â€¦ Once a day the days older than a week go away, the oldest files also when all are
+/// over the limit, and the one file of older versions (debug-log.txt, debug-log.old.txt). The callers lock.
+/// </summary>
+sealed class DailyLog(string name, long keepBytes)
+{
+    const long PartSize = 1024 * 1024;
+    const int KeepDays = 7;
+    DateTime _day;
+    int _part;
+    string _file;
+
+    /// <summary>The file the next line goes into (today's, a new part once the current one is full).</summary>
+    public string File
+    {
+        get
+        {
+            if (_file == null || DateTime.Today != _day)
+            {
+                _day = DateTime.Today;
+                _part = 1;
+                while (Full(Part(_part))) _part++;                        // after a restart: on in today's last part
+                _file = Part(_part);
+                CleanUp();
+            }
+            else if (Full(_file)) _file = Part(++_part);
+            return _file;
+        }
+    }
+
+    /// <summary>A line (or several) into today's file.</summary>
+    public void Append(string text)
+    {
+        Directory.CreateDirectory(AppPaths.Logs);
+        System.IO.File.AppendAllText(File, text);
+    }
+
+    string Part(int n) => Path.Combine(AppPaths.Logs, $"{name}-{_day:yyyy-MM-dd}{(n > 1 ? "-" + n : "")}.txt");
+    static bool Full(string f) { var i = new FileInfo(f); return i.Exists && i.Length > PartSize; }
+
+    void CleanUp()
+    {
+        try
+        {
+            var dir = new DirectoryInfo(AppPaths.Logs);
+            if (!dir.Exists) return;
+            foreach (var f in dir.GetFiles(name + ".*txt")) f.Delete();   // name.txt, name.old.txt, name.1.txt of older versions
+            long total = 0;
+            foreach (var f in dir.GetFiles(name + "-*.txt").OrderByDescending(f => f.Name, StringComparer.Ordinal))   // newest first
+            {
+                total += f.Length;
+                bool old = f.Name.Length >= name.Length + 11 && DateTime.TryParse(f.Name.AsSpan(name.Length + 1, 10), out var day) && day < DateTime.Today.AddDays(-KeepDays);
+                if (old || total > keepBytes) f.Delete();
+            }
+        }
+        catch { }
+    }
+}
+
+/// <summary>
+/// Debug mode (Settings â†’ About, off by default): what the app does â€“ start, monitors, pop-ups, launched apps, changed
+/// settings, errors â€“ goes with exact times into Logs\debug-log-<day>.txt in the settings folder, every few minutes with its memory
 /// and handles. "Diagnostic data" packs the logs, settings and a description of the system into one zip file for finding
-/// problems on another PC. Errors also go into log.txt (see <see cref="Log"/>). With debug mode off no log file is written.
+/// problems on another PC. Errors also go into log-<day>.txt (see <see cref="Log"/>). With debug mode off no log file is written.
 /// </summary>
 static class Diag
 {
-    /// <summary>HeMiDock.exe --measure (the older --timing too): the times of the start and the load of the dock into log.txt.</summary>
+    /// <summary>HeMiDock.exe --measure (the older --timing too): the times of the start and the load of the dock into log-<day>.txt.</summary>
     public static readonly bool Measuring = Environment.GetCommandLineArgs().Any(a => a is "--measure" or "--timing");
     static bool Timing => Measuring;
     static readonly List<string> Marks = new();
 
     /// <summary>
-    /// HeMiDock.exe --measure: the milliseconds from the start of the process to each step of the start, written into log.txt
+    /// HeMiDock.exe --measure: the milliseconds from the start of the process to each step of the start, written into log-<day>.txt
     /// once the dock is drawn (to find what makes the start slow on another PC).
     /// </summary>
     public static void Mark(string step)
@@ -33,8 +93,6 @@ static class Diag
     static readonly object Gate = new();
     static Timer _beat;
     static bool _on, _applied;
-
-    static string LogFile => Path.Combine(AppPaths.Logs, "debug-log.txt");
 
     public static bool On => _applied ? _on : DockSettings.Current?.DebugMode == true;
 
@@ -54,7 +112,7 @@ static class Diag
         {
             Write("Debug", "debug mode on");
             StartWatching();                                              // the freeze watch and the events of Windows (they write only in debug mode)
-            // once the app has started (docks, tray icons) – a moment later
+            // once the app has started (docks, tray icons) â€“ a moment later
             Task.Delay(3000).ContinueWith(_ => Write("System", "\n" + SystemInfo()));
             _beat ??= new Timer(_ => Write("Heartbeat", Resources() + $", CPU of the dock {DockCpu():0.0} %, of the PC {SystemCpu():0} %, window events: {WinEvents.TakeCounts()}"));
             _beat.Change(TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(5));
@@ -62,11 +120,11 @@ static class Diag
         else _beat?.Change(Timeout.Infinite, Timeout.Infinite);
     }
 
-    // ───────────────────────── events ─────────────────────────
-    // Only in debug mode (without it the app records nothing at all): every event goes into debug-log.txt and into a memory of
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ events â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // Only in debug mode (without it the app records nothing at all): every event goes into debug-log-<day>.txt and into a memory of
     // the last ones (a crash and the diagnostic data have what happened right before). The same line
     // again and again is written once with how many times it came; many lines of one kind in a second are marked as a storm
-    // (the AppBar messages that made the whole PC stutter were 40 in 0.3 s – easy to miss among the other lines).
+    // (the AppBar messages that made the whole PC stutter were 40 in 0.3 s â€“ easy to miss among the other lines).
 
     const int RingSize = 3000;
     static readonly string[] Ring = new string[RingSize];
@@ -77,7 +135,7 @@ static class Diag
     static readonly Dictionary<string, (DateTime From, int Count, bool Told)> Rates = new();
     const int StormCount = 20;
 
-    /// <summary>One event: into the memory of the last ones, and in debug mode into debug-log.txt (started again above 4 MB).</summary>
+    /// <summary>One event: into the memory of the last ones, and in debug mode into the log of the day (see <see cref="LogFile"/>).</summary>
     public static void Write(string where, string message)
     {
         if (!On) return;                                                  // with debug mode off nothing at all, not even in memory
@@ -104,11 +162,11 @@ static class Diag
         catch { }
     }
 
-    /// <summary>"↑ the same ×N" after a line that came again and again.</summary>
+    /// <summary>"â†‘ the same Ă—N" after a line that came again and again.</summary>
     static void FlushRepeats()
     {
         if (_repeats == 0) return;
-        Store($"{_lastAt:yyyy-MM-dd HH:mm:ss.fff}   ↑ the same ×{_repeats} more in {(_lastAt - _repeatFrom).TotalMilliseconds:0} ms");
+        Store($"{_lastAt:yyyy-MM-dd HH:mm:ss.fff}   â†‘ the same Ă—{_repeats} more in {(_lastAt - _repeatFrom).TotalMilliseconds:0} ms");
         _repeats = 0;
     }
 
@@ -123,7 +181,7 @@ static class Diag
         if (r.Count >= StormCount && !r.Told)
         {
             r.Told = true;
-            Store($"{now:yyyy-MM-dd HH:mm:ss.fff} [{Environment.CurrentManagedThreadId}] [STORM] {r.Count}× \"{where}: {message}\" within {(now - r.From).TotalMilliseconds:0} ms");
+            Store($"{now:yyyy-MM-dd HH:mm:ss.fff} [{Environment.CurrentManagedThreadId}] [STORM] {r.Count}Ă— \"{where}: {message}\" within {(now - r.From).TotalMilliseconds:0} ms");
         }
         Rates[k] = r;
         if (Rates.Count > 400) foreach (var old in Rates.Where(p => (now - p.Value.From).TotalSeconds > 5).Select(p => p.Key).ToList()) Rates.Remove(old);
@@ -136,13 +194,15 @@ static class Diag
         _ringNext = (_ringNext + 1) % RingSize;
         if (_ringCount < RingSize) _ringCount++;
         if (!On) return;
-        Directory.CreateDirectory(AppPaths.Logs);
-        var file = new FileInfo(LogFile);
-        if (file.Exists && file.Length > 4 * 1024 * 1024) File.Move(LogFile, Path.Combine(AppPaths.Logs, "debug-log.old.txt"), true);
-        File.AppendAllText(LogFile, line + "\n");
+        Daily.Append(line + "\n");
     }
 
-    /// <summary>The last events (oldest first) – for a crash, a freeze and the diagnostic data.</summary>
+    static readonly DailyLog Daily = new("debug-log", 20 * 1024 * 1024);
+
+    /// <summary>The file the next line goes into (today's, see <see cref="DailyLog"/>).</summary>
+    internal static string LogFile => Daily.File;
+
+    /// <summary>The last events (oldest first) â€“ for a crash, a freeze and the diagnostic data.</summary>
     public static string Recent(int count = RingSize)
     {
         lock (Gate)
@@ -155,9 +215,10 @@ static class Diag
         }
     }
 
-    /// <summary>An unhandled error: it and the events before it into Logs\crash-context.txt (also with debug mode off).</summary>
+    /// <summary>An unhandled error: it and the events before it into Logs\crash-context.txt (only in debug mode, like every log).</summary>
     public static void Crash(Exception ex)
     {
+        if (!On) return;
         try
         {
             Directory.CreateDirectory(AppPaths.Logs);
@@ -167,7 +228,7 @@ static class Diag
     }
 
     /// <summary>
-    /// Measures a piece of work: <c>using (Diag.Time("Dock placed")) { … }</c> – a line only when it took longer than
+    /// Measures a piece of work: <c>using (Diag.Time("Dock placed")) { â€¦ }</c> â€“ a line only when it took longer than
     /// <paramref name="limitMs"/> (a slow dock or pop-up shows in the log with what was slow).
     /// </summary>
     public static Timed Time(string what, int limitMs = 50) => new(what, limitMs);
@@ -185,12 +246,12 @@ static class Diag
         }
     }
 
-    // ───────────────────────── freezes and the system ─────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ freezes and the system â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     static Thread _watch;
 
     /// <summary>
-    /// Once: a thread that asks the thread of the interface every half second whether it answers – a freeze (the dock, Start or
+    /// Once: a thread that asks the thread of the interface every half second whether it answers â€“ a freeze (the dock, Start or
     /// the control center not reacting) is written with how long it lasted. And the events of Windows that often come before
     /// problems: sleep and wake, lock and unlock, monitors and display settings, the theme.
     /// </summary>
@@ -204,7 +265,7 @@ static class Diag
             SystemEvents.PowerModeChanged += (_, e) => Write("System", "power: " + e.Mode);
             SystemEvents.SessionSwitch += (_, e) => Write("System", "session: " + e.Reason);
             SystemEvents.DisplaySettingsChanged += (_, _) => Write("System", "display settings changed: " +
-                string.Join(", ", Monitors.All().Select(m => $"{m.Device} {m.Bounds.Right - m.Bounds.Left}×{m.Bounds.Bottom - m.Bounds.Top} work {m.Work.Left},{m.Work.Top}–{m.Work.Right},{m.Work.Bottom}")));
+                string.Join(", ", Monitors.All().Select(m => $"{m.Device} {m.Bounds.Right - m.Bounds.Left}Ă—{m.Bounds.Bottom - m.Bounds.Top} work {m.Work.Left},{m.Work.Top}â€“{m.Work.Right},{m.Work.Bottom}")));
             SystemEvents.UserPreferenceChanged += (_, e) => Write("System", "user preference changed: " + e.Category);
             SystemEvents.TimeChanged += (_, _) => Write("System", "time changed");
         }
@@ -222,16 +283,40 @@ static class Diag
             long start = Stopwatch.GetTimestamp();
             try { Ui.Post(() => answered.Set()); } catch { continue; }
             if (answered.Wait(250)) continue;
-            // no answer: wait on, telling a long freeze already while it lasts (a hang that never ends is still seen)
+            // no answer: what the interface is doing and which window is in front, taken now (while it is stuck); then wait
+            // on, telling a long freeze already while it lasts (a hang that never ends is still seen)
+            string doing = Ui.Doing, front = Foreground();
             bool told = false;
             while (!answered.Wait(1000))
             {
                 double so = Stopwatch.GetElapsedTime(start).TotalMilliseconds;
-                if (!told && so > 5000) { told = true; Write("FREEZE", $"the interface has not answered for {so:0} ms (still waiting) · {Resources()}"); }
+                if (!told && so > 5000)
+                {
+                    told = true;
+                    if (Ui.Doing is { } now && now != doing) doing += " â†’ " + now;
+                    Write("FREEZE", $"the interface has not answered for {so:0} ms (still waiting) Â· busy with: {doing ?? OutsidePosted} Â· in front: {front} Â· {Resources()}");
+                }
             }
             double ms = Stopwatch.GetElapsedTime(start).TotalMilliseconds;
-            Write("FREEZE", $"the interface did not answer for {ms:0} ms · CPU of the PC {SystemCpu():0} %");
+            Write("FREEZE", $"the interface did not answer for {ms:0} ms Â· busy with: {doing ?? OutsidePosted} Â· in front: {front} Â· CPU of the PC {SystemCpu():0} %");
         }
+    }
+
+    const string OutsidePosted = "none of the dock's posted work (a XAML event, layout or drawing, or a call from Windows)";
+
+    [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr hwnd, out uint pid);
+
+    /// <summary>The process of the window in front (a freeze while a game, VMware or Explorer is busy points there).</summary>
+    static string Foreground()
+    {
+        try
+        {
+            GetWindowThreadProcessId(GetForegroundWindow(), out uint pid);
+            using var p = Process.GetProcessById((int)pid);
+            return p.ProcessName + ".exe";
+        }
+        catch { return "?"; }
     }
 
     [DllImport("kernel32.dll")] static extern bool GetSystemTimes(out long idle, out long kernel, out long user);
@@ -254,15 +339,15 @@ static class Diag
         if (!On) return;
         // the address of the internet calendar often has a private key in it
         string text = name == nameof(DockSettings.CalendarIcs) ? "<hidden>" : value?.ToString() ?? "null";
-        Write("Setting", $"{name} = {(text.Length > 120 ? text[..120] + "…" : text)}");
+        Write("Setting", $"{name} = {(text.Length > 120 ? text[..120] + "â€¦" : text)}");
     }
 
-    // ───────────────────────── what is written ─────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ what is written â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     [DllImport("user32.dll")] static extern uint GetGuiResources(IntPtr process, uint flags);
     [DllImport("user32.dll")] static extern bool SystemParametersInfo(uint action, uint param, out int value, uint ini);
 
-    /// <summary>Memory and handles of the app – a leak shows as numbers that keep growing.</summary>
+    /// <summary>Memory and handles of the app â€“ a leak shows as numbers that keep growing.</summary>
     static string Resources()
     {
         using var p = Process.GetCurrentProcess();
@@ -288,7 +373,7 @@ static class Diag
 
     static string Reg(string key, string name) => Registry.GetValue(key, name, null)?.ToString() ?? "?";
 
-    /// <summary>The app, Windows, the monitors and the state of the shell – the start of every debug log and of the diagnostic data.</summary>
+    /// <summary>The app, Windows, the monitors and the state of the shell â€“ the start of every debug log and of the diagnostic data.</summary>
     public static string SystemInfo()
     {
         const string nt = @"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion";
@@ -306,15 +391,15 @@ static class Diag
         s.AppendLine($"  theme {(Theme.IsLight ? "light" : "dark")}, transparency {Reg(personalize, "EnableTransparency")}, animations {(animations ? "on" : "off")}");
         s.AppendLine($"  Explorer running: {Process.GetProcessesByName("explorer").Length > 0}");
         foreach (var m in Monitors.All())
-            s.AppendLine($"Monitor {m.Device}{(m.Primary ? " (primary)" : "")}: {m.Bounds.Right - m.Bounds.Left}×{m.Bounds.Bottom - m.Bounds.Top} at {m.Bounds.Left},{m.Bounds.Top}, " +
-                         $"work area {m.Work.Left},{m.Work.Top}–{m.Work.Right},{m.Work.Bottom}, scaling {Native.MonitorDpi(m.Handle) * 100:0} %");
+            s.AppendLine($"Monitor {m.Device}{(m.Primary ? " (primary)" : "")}: {m.Bounds.Right - m.Bounds.Left}Ă—{m.Bounds.Bottom - m.Bounds.Top} at {m.Bounds.Left},{m.Bounds.Top}, " +
+                         $"work area {m.Work.Left},{m.Work.Top}â€“{m.Work.Right},{m.Work.Bottom}, scaling {Native.MonitorDpi(m.Handle) * 100:0} %");
         try { if (DescribeUi?.Invoke() is { Length: > 0 } ui) s.AppendLine(ui); } catch { }
         s.AppendLine($"Graphics: {GraphicsChip.Name} (integrated: {GraphicsChip.Integrated}), lighter drawing: {DockSettings.Current.LowGraphics}, frosted glass: {DockSettings.Current.Blur}");
         s.AppendLine("Process: " + Resources());
         return s.ToString();
     }
 
-    // ───────────────────────── diagnostic data ─────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ diagnostic data â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     /// <summary>
     /// A zip file on the desktop: the logs and settings of HeMiDock, the description of the system and the crashes of
@@ -325,7 +410,7 @@ static class Diag
         try
         {
             string zip = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), $"HeMiDock-diagnostics-{DateTime.Now:yyyyMMdd-HHmm}.zip");
-            Write("Debug", "diagnostic data → " + zip);
+            Write("Debug", "diagnostic data â†’ " + zip);
             if (File.Exists(zip)) File.Delete(zip);
             using var archive = ZipFile.Open(zip, ZipArchiveMode.Create);
             // the settings (folder of the app) and the logs (its Logs folder, kept as Logs\ in the zip)
@@ -336,7 +421,7 @@ static class Diag
                 {
                     var ext = Path.GetExtension(file).ToLowerInvariant();
                     if (ext is not (".txt" or ".json") || new FileInfo(file).Length > 16 * 1024 * 1024) continue;
-                    // the log may be written right now – read through a shared read
+                    // the log may be written right now â€“ read through a shared read
                     using var src = new StreamReader(new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete));
                     Add(archive, prefix + Path.GetFileName(file), src.ReadToEnd());
                 }
@@ -361,7 +446,7 @@ static class Diag
 
     /// <summary>
     /// For the diagnostic data: the address of the internet calendar hidden (it often has a private key in it), the user
-    /// folder (with the user name) written as %USERPROFILE% – also in the JSON of the settings, where \ is doubled.
+    /// folder (with the user name) written as %USERPROFILE% â€“ also in the JSON of the settings, where \ is doubled.
     /// </summary>
     internal static string Anonymize(string text, string calendar, string profile)
     {
@@ -377,7 +462,7 @@ static class Diag
     }
 
     /// <summary>
-    /// The processes that take the most memory and the most processor time (since they started) – when the PC is slow, whether
+    /// The processes that take the most memory and the most processor time (since they started) â€“ when the PC is slow, whether
     /// it is the dock or something else; also the other shells and tools that change the taskbar (they can fight the dock).
     /// </summary>
     static string Processes()

@@ -415,13 +415,16 @@ namespace ManagedShell.WindowsTasks
         }
 
         // the reason a window is left out of the taskbar, logged only when it changes: it is asked again for every window of
-        // an app whenever one of them comes to the front (four hidden windows of Explorer gave four lines each time)
-        private string _hiddenWhy;
+        // an app whenever one of them comes to the front (four hidden windows of Explorer gave four lines each time). Kept per
+        // handle, not per object: a new ApplicationWindow is made for every look-up, so TextInputHost (cloaked) was written
+        // every 2 seconds – 23 000 lines a day.
+        private static readonly System.Collections.Concurrent.ConcurrentDictionary<IntPtr, string> HiddenWhy = new();
 
         private void LogHidden(string why)
         {
-            if (_hiddenWhy == why) return;
-            _hiddenWhy = why;
+            if (HiddenWhy.TryGetValue(Handle, out var was) && was == why) return;
+            if (HiddenWhy.Count > 2000) HiddenWhy.Clear();
+            HiddenWhy[Handle] = why;
             ShellLogger.Debug($"ApplicationWindow: {Handle} ({LogName}) hidden from taskbar: {why}");
         }
 
@@ -447,7 +450,7 @@ namespace ManagedShell.WindowsTasks
                 }
             }
 
-            _hiddenWhy = null;
+            HiddenWhy.TryRemove(Handle, out _);
             return CanAddToTaskbar;
         }
 
@@ -1422,8 +1425,7 @@ namespace ManagedShell.WindowsTasks
                         msg.Result = IntPtr.Zero;
                         return;
                     case (int)WM.USER + 64:
-                        // SetProgressValue
-                        ShellLogger.Debug("TasksService: ITaskbarList: SetProgressValue HWND:" + msg.WParam + " Progress: " + msg.LParam);
+                        // SetProgressValue – not logged: a download or a copy sends it every 80 ms (5 700 lines a day)
 
                         win = new ApplicationWindow(this, msg.WParam);
                         if (Windows.Contains(win))
@@ -1435,13 +1437,13 @@ namespace ManagedShell.WindowsTasks
                         msg.Result = IntPtr.Zero;
                         return;
                     case (int)WM.USER + 65:
-                        // SetProgressState
-                        ShellLogger.Debug("TasksService: ITaskbarList: SetProgressState HWND:" + msg.WParam + " Flags: " + msg.LParam);
-
+                        // SetProgressState – logged only when the state changes (it comes again with every SetProgressValue)
                         win = new ApplicationWindow(this, msg.WParam);
                         if (Windows.Contains(win))
                         {
                             win = Windows.First(wnd => wnd.Handle == msgCopy.WParam);
+                            if (win.ProgressState != (TBPFLAG)msg.LParam)
+                                ShellLogger.Debug("TasksService: ITaskbarList: SetProgressState HWND:" + msg.WParam + " Flags: " + msg.LParam);
                             win.ProgressState = (TBPFLAG)msg.LParam;
                         }
 

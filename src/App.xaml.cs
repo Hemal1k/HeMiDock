@@ -6,7 +6,7 @@ namespace HeMiDock;
 /// HeMiDock: one instance, the taskbar of Windows replaced by the docks and the top bar. Switches:
 ///  --open start|search|control|calendar|settings[:page]  opens it (in the running dock too; a start without switches = settings),
 ///  --exit  ends the running dock, --workspace "name" / --pin-start "file"  (shortcuts of workspaces, "Pin to Start" of Explorer),
-///  --measure  the times of the start and the load every 10 s into log.txt.
+///  --measure  the times of the start and the load every 10 s into Logs\log-<day>.txt.
 /// Debug only: --selftest, --cycle, --simulate …; --watchdog is the guard process the app starts itself.
 /// </summary>
 public partial class App : Application

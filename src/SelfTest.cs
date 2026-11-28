@@ -16,7 +16,7 @@ static class SelfTest
     {
         var report = new List<string> { "HeMiDock self test " + DateTime.Now };
         var saved = Files.ToDictionary(f => f, f => File.Exists(AppPaths.Of(f)) ? File.ReadAllBytes(AppPaths.Of(f)) : null);
-        string backups = AppPaths.Of("Backups"), log = Path.Combine(AppPaths.Logs, "debug-log.txt");
+        string backups = AppPaths.Of("Backups"), log = Diag.LogFile;
         var backupsBefore = Directory.Exists(backups) ? Directory.GetDirectories(backups).ToHashSet() : new HashSet<string>();
         byte[] logBefore = File.Exists(log) ? File.ReadAllBytes(log) : null;
         string a = Path.Combine(Path.GetTempPath(), "hemidock-selftest-a.json"), b = Path.Combine(Path.GetTempPath(), "hemidock-selftest-b.json");
@@ -25,7 +25,7 @@ static class SelfTest
             PinTransfer.Connect();
             var s = DockSettings.Current;
 
-            // debug mode: a line written goes into debug-log.txt
+            // debug mode: a line written goes into the log of the day
             bool wasDebug = s.DebugMode;
             long before = File.Exists(log) ? new FileInfo(log).Length : 0;
             s.DebugMode = true;

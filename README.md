@@ -60,7 +60,8 @@ Everything the build makes goes to `build\`; the app runs from `build\bin\HeMiDo
 Stop a running dock first (`HeMiDock.exe --exit`) – it keeps its files open.
 
 Command line: `--open start|search|control|calendar|settings[:page]`, `--exit`, `--measure` (start times and load into
-`%AppData%\HeMi\HeMiDock\Logs\log.txt`). Debug builds only: `--selftest`, `--cycle`, `--simulate battery=34,charging,wifi,bluetooth,cellular`.
+`%AppData%\HeMi\HeMiDock\Logs\log-<day>.txt`). Logs are written only in debug mode (Settings → About): one file a day
+(`debug-log-<day>.txt`, a new part after 1 MB), kept for a week. Debug builds only: `--selftest`, `--cycle`, `--simulate battery=34,charging,wifi,bluetooth,cellular`.
 
 ## Releases
 
