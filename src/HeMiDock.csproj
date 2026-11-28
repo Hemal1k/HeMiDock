@@ -148,7 +148,7 @@
     <!-- display brightness (WMI) -->
     <PackageReference Include="System.Management" Version="9.0.10" />
     <!-- file search in the Windows Search index -->
-    <PackageReference Include="System.Data.OleDb" Version="9.0.10" />
+    <PackageReference Include="System.Data.OleDb" Version="11.0.0" />
   </ItemGroup>
 
   <Import Project="Sdk.targets" Sdk="Microsoft.NET.Sdk" />
